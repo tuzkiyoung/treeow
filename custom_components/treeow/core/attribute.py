@@ -5,7 +5,13 @@ from typing import List
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.components.switch import SwitchDeviceClass
-from homeassistant.const import Platform, UnitOfTemperature, PERCENTAGE, UnitOfVolume, UnitOfEnergy
+from homeassistant.const import (
+    Platform,
+    UnitOfTemperature,
+    PERCENTAGE,
+    UnitOfTime,
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+)
 
 from custom_components.treeow.helpers import equals_ignore_case, contains_any_ignore_case
 
@@ -186,6 +192,7 @@ class V1SpecAttributeParser(TreeowAttributeParser, ABC):
 
         if '天数' in display_name:
             state_class = SensorStateClass.MEASUREMENT
+            return state_class, SensorDeviceClass.DURATION, UnitOfTime.DAYS
 
         if '温度' in display_name:
             return state_class, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS
@@ -193,16 +200,15 @@ class V1SpecAttributeParser(TreeowAttributeParser, ABC):
         if '湿度' in display_name:
             return state_class, SensorDeviceClass.HUMIDITY, PERCENTAGE
 
-        if '用水量' in display_name:
-            return state_class, SensorDeviceClass.WATER, UnitOfVolume.LITERS
-
-        if '用气量' in display_name:
-            return state_class, SensorDeviceClass.GAS, UnitOfVolume.LITERS
-
-        if '用电量' in display_name:
-            return state_class, SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR
+        if '寿命' in display_name:
+            return state_class, SensorDeviceClass.BATTERY, PERCENTAGE
 
         if 'pm25' in identifier:
             state_class = SensorStateClass.MEASUREMENT
+            return state_class, SensorDeviceClass.PM25, CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+
+        if 'aal' in identifier:
+            state_class = SensorStateClass.MEASUREMENT
+            return state_class, SensorDeviceClass.AQI, None
 
         return state_class, None, None
