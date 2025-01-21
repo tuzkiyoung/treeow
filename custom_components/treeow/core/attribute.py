@@ -137,8 +137,8 @@ class V1SpecAttributeParser(TreeowAttributeParser, ABC):
         enum = attribute["schema"]["enum"]
         enum_desc = attribute["schema"]["enumDesc"]
         if attribute['identifier'] == 'fan_speed_enum':
-            enum.append(255)
-            enum_desc.append('0gear')
+            enum.insert(0, 255)
+            enum_desc.insert(0, '0gear')
         combined = list(zip(enum, enum_desc))
         combined.extend(list(zip(enum_desc, enum)))
         value_comparison_table = dict(combined)
