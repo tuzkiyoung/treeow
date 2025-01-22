@@ -2,12 +2,10 @@ import asyncio
 import hashlib
 import json
 import logging
-import random
 import threading
 import time
 import uuid
 from typing import List
-import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -24,6 +22,7 @@ DESCRIBE_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/device/info'
 SYNC_DEVICES_API = 'https://eziotes.treeow.com.cn/api/v3/device/otap/prop'
 LIST_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/v3/device/list/page'
 LIST_HOME_API = 'https://eziotes.treeow.com.cn/api/resource/home/list'
+GET_APP_VERSION_API = 'https://itunes.apple.com/cn/lookup?id=6505056723'
 
 
 class TokenInfo:
@@ -54,12 +53,21 @@ class TreeowClient:
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
+        self._app_version = ''
         self._hass = hass
         self._session = async_get_clientsession(hass)
 
     @property
     def hass(self):
         return self._hass
+
+    async def get_app_version(self):
+        async with self._session.post(url=GET_APP_VERSION_API) as response:
+            content = await response.json(content_type=None)
+            if content['resultCount'] == 1 and content['results'][0]['trackName'] == 'Treeow Home':
+                self._app_version = content['results'][0]['version']
+            else:
+                self._app_version = '1.1.2'
 
     async def login(self, account: str, password: str) -> TokenInfo:
         """
@@ -326,6 +334,7 @@ class TreeowClient:
                 'deviceserial': device.device_serial,
                 'resourcecategory': device.resourceCategory
             })
+            _LOGGER.debug('client._send_heartbeat: {}'.format(req_headers))
             async with self._session.put(url=SYNC_DEVICES_API, json=payload, headers=req_headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
@@ -384,7 +393,7 @@ class TreeowClient:
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "zh-Hans-CN;q=1, en-US;q=0.9",
             "clienttype": "2",
-            "user-agent": "Treeow/1.1.2 (iPhone; iOS 18.2.1; Scale/3.00)"
+            "user-agent": f"Treeow/{self._app_version} (iPhone; iOS 18.2.1; Scale/3.00)"
         }
 
     @staticmethod

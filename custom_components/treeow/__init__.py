@@ -29,6 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     account_cfg = AccountConfig(hass, entry)
     client = TreeowClient(hass, account_cfg.access_token)
+    await client.get_app_version()
     devices = await client.get_devices()
     _LOGGER.debug('共获取到{}个设备'.format(len(devices)))
     hass.data[DOMAIN]['devices'] = devices
@@ -71,6 +72,7 @@ async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
     """
     cfg = AccountConfig(hass, entry)
     client = TreeowClient(hass, cfg.access_token)
+    await client.get_app_version()
 
     token_valid = True
     try:
