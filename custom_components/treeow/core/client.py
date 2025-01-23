@@ -53,7 +53,7 @@ class TreeowClient:
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
-        self._app_version = ''
+        self._app_version = '1.1.3'
         self._hass = hass
         self._session = async_get_clientsession(hass)
 
@@ -64,10 +64,8 @@ class TreeowClient:
     async def get_app_version(self):
         async with self._session.post(url=GET_APP_VERSION_API) as response:
             content = await response.json(content_type=None)
-            if content['resultCount'] == 1 and content['results'][0]['trackName'] == 'Treeow Home':
+            if content['results'] and content['results'][0]['trackName'] == 'Treeow Home':
                 self._app_version = content['results'][0]['version']
-            else:
-                self._app_version = '1.1.2'
 
     async def login(self, account: str, password: str) -> TokenInfo:
         """
