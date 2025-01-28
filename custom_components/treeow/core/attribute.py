@@ -207,6 +207,10 @@ class V1SpecAttributeParser(TreeowAttributeParser, ABC):
             state_class = SensorStateClass.MEASUREMENT
             return state_class, SensorDeviceClass.PM25, CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
 
+        if '甲醛' in display_name:
+            state_class = SensorStateClass.MEASUREMENT
+            return state_class, SensorDeviceClass.AQI, None
+        
         if 'aal' in identifier:
             state_class = SensorStateClass.MEASUREMENT
             return state_class, SensorDeviceClass.AQI, None
