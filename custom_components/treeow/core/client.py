@@ -23,6 +23,7 @@ SYNC_DEVICES_API = 'https://eziotes.treeow.com.cn/api/v3/device/otap/prop'
 LIST_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/v3/device/list/page'
 LIST_HOME_API = 'https://eziotes.treeow.com.cn/api/resource/home/list'
 GET_APP_VERSION_API = 'https://itunes.apple.com/cn/lookup?id=6505056723'
+GET_IOS_VERSION_API = 'https://api.ipsw.me/v4/releases'
 
 
 class TokenInfo:
@@ -54,6 +55,7 @@ class TreeowClient:
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
         self._app_version = '1.1.3'
+        self._ios_version = '18.3'
         self._hass = hass
         self._session = async_get_clientsession(hass)
 
@@ -66,6 +68,21 @@ class TreeowClient:
             content = await response.json(content_type=None)
             if content['results'] and content['results'][0]['trackName'] == 'Treeow Home':
                 self._app_version = content['results'][0]['version']
+
+    async def get_ios_version(self):
+        async with self._session.post(url=GET_IOS_VERSION_API) as response:
+            content = await response.json(content_type=None)
+            if len(content) > 0:
+                for item in content:
+                    releases = item.get('releases', [])
+                    for release in releases:
+                        if release.get('type') == 'iOS':
+                            name = release.get('name', '')
+                            self._ios_version = name.split(' ')[1].split('(')[0]
+                            break
+                    else:
+                        continue
+                    break
 
     async def login(self, account: str, password: str) -> TokenInfo:
         """
@@ -242,7 +259,7 @@ class TreeowClient:
             content = await response.json(content_type=None)
             self._assert_response_successful(content)
             if content['data']:
-                value_data = json.loads(content['data']['props'][0]['value'])['Air_Purifier']
+                value_data = json.loads(content['data']['props'][0]['value'])[device.category]
 
         attributes = await self.get_digital_model(device)
 
@@ -384,6 +401,7 @@ class TreeowClient:
                 raise TreeowClientException('send_command异常: ' + get_content['meta']['message'])
 
     async def _generate_common_headers(self):
+        _LOGGER.debug('client.common_headers.ios_version: {}'.format(self._ios_version))
         return {
             "content-type": "application/json;charset=utf8",
             "authorization": f"Bearer {self._access_token}",
@@ -391,7 +409,7 @@ class TreeowClient:
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "zh-Hans-CN;q=1, en-US;q=0.9",
             "clienttype": "2",
-            "user-agent": f"Treeow/{self._app_version} (iPhone; iOS 18.2.1; Scale/3.00)"
+            "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
         }
 
     @staticmethod
