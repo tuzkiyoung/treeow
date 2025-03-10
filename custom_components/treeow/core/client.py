@@ -72,7 +72,6 @@ class TreeowClient:
     async def get_ios_version(self):
         async with self._session.post(url=GET_IOS_VERSION_API) as response:
             content = await response.json(content_type=None)
-            _LOGGER.debug('client.get_ios_version: {}'.format(content))
             if len(content) > 0:
                 for item in content:
                     releases = item.get('releases', [])
@@ -260,7 +259,7 @@ class TreeowClient:
             content = await response.json(content_type=None)
             self._assert_response_successful(content)
             if content['data']:
-                value_data = json.loads(content['data']['props'][0]['value'])['Air_Purifier']
+                value_data = json.loads(content['data']['props'][0]['value'])[device.category]
 
         attributes = await self.get_digital_model(device)
 
@@ -410,7 +409,7 @@ class TreeowClient:
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "zh-Hans-CN;q=1, en-US;q=0.9",
             "clienttype": "2",
-            "user-agent": f"Treeow/{self._app_version} (iPhone; iOS 18.2.1; Scale/3.00)"
+            "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
         }
 
     @staticmethod
