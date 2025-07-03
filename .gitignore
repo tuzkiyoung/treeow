@@ -1,3 +1,5 @@
 .venv
 .idea
 .DS_Store
+custom_components/treeow/__pycache__
+custom_components/treeow/core/__pycache__
