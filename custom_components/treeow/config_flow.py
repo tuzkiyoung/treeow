@@ -63,7 +63,8 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+        #self.config_entry = config_entry
+        super().__init__(config_entry)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """

@@ -64,13 +64,13 @@ class TreeowClient:
         return self._hass
 
     async def get_app_version(self):
-        async with self._session.post(url=GET_APP_VERSION_API) as response:
+        async with self._session.get(url=GET_APP_VERSION_API) as response:
             content = await response.json(content_type=None)
             if content['results'] and content['results'][0]['trackName'] == 'Treeow Home':
                 self._app_version = content['results'][0]['version']
 
     async def get_ios_version(self):
-        async with self._session.post(url=GET_IOS_VERSION_API) as response:
+        async with self._session.get(url=GET_IOS_VERSION_API) as response:
             content = await response.json(content_type=None)
             if len(content) > 0:
                 for item in content:
@@ -402,6 +402,7 @@ class TreeowClient:
 
     async def _generate_common_headers(self):
         _LOGGER.debug('client.common_headers.ios_version: {}'.format(self._ios_version))
+        _LOGGER.debug('client.common_headers.app_version: {}'.format(self._app_version))
         return {
             "content-type": "application/json;charset=utf8",
             "authorization": f"Bearer {self._access_token}",
