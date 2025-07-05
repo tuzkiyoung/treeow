@@ -85,7 +85,6 @@ class DeviceFilterConfig:
     def set_target_devices(self, devices: List[str]):
         if not isinstance(devices, list):
             raise ValueError()
-        _LOGGER.debug('config.set_target_devices.devices: {}'.format(devices))
         self._target_devices = devices
 
     @property

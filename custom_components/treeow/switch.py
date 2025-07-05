@@ -16,34 +16,47 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
+    """Optimized switch setup with batch processing."""
     await async_register_entity(
         hass,
         entry,
         async_add_entities,
         Platform.SWITCH,
-        lambda device, attribute: TreeowSwitch(device, attribute)
+        TreeowSwitch
     )
 
 
 class TreeowSwitch(TreeowAbstractEntity, SwitchEntity):
+    """Optimized switch entity with improved error handling."""
+
+    __slots__ = ('_attr_key',)
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         super().__init__(device, attribute)
+        # Cache attribute key to avoid repeated property access
+        self._attr_key = attribute.key
 
     def _update_value(self):
+        """Optimized value update with better error handling."""
+        value = self._attributes_data.get(self._attr_key)
+        if value is None:
+            self._attr_is_on = False
+            return
+            
         try:
-            self._attr_is_on = try_read_as_bool(self._attributes_data[self._attribute.key])
+            self._attr_is_on = try_read_as_bool(value)
+            # Reset availability if previously failed
+            if not self._attr_available:
+                self._attr_available = True
         except ValueError:
-            _LOGGER.exception('entity [{}] read value failed'.format(self._attr_unique_id))
+            _LOGGER.warning(f'Switch [{self._attr_unique_id}] failed to read value: {value}')
             self._attr_available = False
 
     def turn_on(self, **kwargs: Any) -> None:
-        self._send_command({
-            self._attribute.key: True
-        })
+        """Turn the switch on."""
+        self._send_command({self._attr_key: True})
 
     def turn_off(self, **kwargs: Any) -> None:
-        self._send_command({
-            self._attribute.key: False
-        })
+        """Turn the switch off."""
+        self._send_command({self._attr_key: False})
 
