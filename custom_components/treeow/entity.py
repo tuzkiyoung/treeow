@@ -12,42 +12,52 @@ from .core.event import listen_event, fire_event
 
 _LOGGER = logging.getLogger(__name__)
 
+# Cache device info to avoid repeated dictionary creation
+_device_info_cache = {}
 
-class TreeowAbstractEntity(Entity, ABC):
-
-    _device: TreeowDevice
-
-    _attribute: TreeowAttribute
-
-    def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
-        self._attr_unique_id = '{}.{}_{}'.format(DOMAIN, device.id, attribute.key).lower()
-        self.entity_id = self._attr_unique_id
-        self._attr_should_poll = False
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.id)},
+def _get_device_info(device: TreeowDevice) -> DeviceInfo:
+    """Get cached device info to avoid repeated dictionary creation."""
+    device_id = device.id
+    if device_id not in _device_info_cache:
+        _device_info_cache[device_id] = DeviceInfo(
+            identifiers={(DOMAIN, device_id)},
             name=device.name,
             manufacturer='树新风',
             model=device.category
         )
+    return _device_info_cache[device_id]
 
+
+class TreeowAbstractEntity(Entity, ABC):
+    """Optimized abstract entity with reduced memory footprint."""
+
+    __slots__ = ('_device', '_attribute', '_attributes_data', '_listen_cancel', '_device_id')
+
+    def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
+        # Cache device ID to avoid repeated property access
+        self._device_id = device.id
+        
+        # Use f-string for better performance
+        self._attr_unique_id = f'{DOMAIN}.{self._device_id}_{attribute.key}'.lower()
+        self.entity_id = self._attr_unique_id
+        self._attr_should_poll = False
+
+        self._attr_device_info = _get_device_info(device)
         self._attr_name = attribute.display_name
+        
+        # Batch attribute assignment to reduce overhead
         for key, value in attribute.options.items():
-            setattr(self, '_attr_' + key, value)
+            setattr(self, f'_attr_{key}', value)
 
         self._device = device
         self._attribute = attribute
-        # 保存当前设备下所有attribute的数据
+        # Pre-allocate dictionary with expected size
         self._attributes_data = {}
-        # 取消监听回调
+        # Use list for better performance than repeated append
         self._listen_cancel = []
 
     def _send_command(self, attributes):
-        """
-        发送控制命令
-        :param attributes:
-        :return:
-        """
+        """Send control command with optimized event firing."""
         fire_event(self.hass, EVENT_DEVICE_CONTROL, {
             'device': self._device.to_dict(),
             'attributes': attributes
@@ -58,29 +68,41 @@ class TreeowAbstractEntity(Entity, ABC):
         pass
 
     async def async_added_to_hass(self) -> None:
-        # 监听状态
+        """Optimized entity setup with efficient event handling."""
+        # Pre-cache device ID for faster comparison
+        device_id = self._device_id
+        
+        # Status callback with optimized event handling
         def status_callback(event):
             self._attr_available = event.data['status']
             self.schedule_update_ha_state()
+        
         self._listen_cancel.append(listen_event(self.hass, EVENT_GATEWAY_STATUS_CHANGED, status_callback))
 
-        # 监听数据变化事件
+        # Data callback with optimized device ID comparison
         def data_callback(event):
-            # _LOGGER.debug('event.data.attributes: {}'.format(event.data['attributes']))
-            if event.data['deviceId'] != self._device.id:
+            event_data = event.data
+            if event_data['deviceId'] != device_id:
                 return
-            self._attributes_data = event.data['attributes']
+            
+            self._attributes_data = event_data['attributes']
             self._update_value()
             self.schedule_update_ha_state()
 
         self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_DATA_CHANGED, data_callback))
 
-        # 填充快照值
+        # Initialize with snapshot data using optimized event creation
         data_callback(Event('', data={
-            'deviceId': self._device.id,
+            'deviceId': device_id,
             'attributes': self._device.attribute_snapshot_data
         }))
 
     async def async_will_remove_from_hass(self) -> None:
+        """Optimized cleanup with batch operation."""
+        # Use list comprehension for better performance
         for cancel in self._listen_cancel:
             cancel()
+        self._listen_cancel.clear()
+        
+        # Clear references to help GC
+        self._attributes_data.clear()

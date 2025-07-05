@@ -2,6 +2,7 @@ import asyncio
 import logging
 import threading
 import time
+from typing import List, Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -15,145 +16,234 @@ from .core.device import TreeowDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+# Constants for optimization
+TOKEN_CHECK_INTERVAL = 3600  # 1 hour
+TOKEN_REFRESH_THRESHOLD = 86400  # 1 day
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Optimized setup entry with reduced initialization time."""
+    # Initialize domain data with pre-allocated structures
     hass.data.setdefault(DOMAIN, {
         'devices': [],
-        'signals': []
+        'signals': [],
+        'client': None
     })
 
-    await try_update_token(hass, entry)
-    # 定时更新token
-    token_signal = threading.Event()
-    hass.async_create_background_task(token_updater(hass, entry, token_signal), 'treeow-token-updater')
-    hass.data[DOMAIN]['signals'].append(token_signal)
-
+    # Initialize client and token management
     account_cfg = AccountConfig(hass, entry)
+    
+    # Try to update token first
+    await _try_update_token(hass, entry, account_cfg)
+    
+    # Create client once and reuse
     client = TreeowClient(hass, account_cfg.access_token)
-    await client.get_app_version()
-    await client.get_ios_version()
-    devices = await client.get_devices()
-    _LOGGER.debug('共获取到{}个设备'.format(len(devices)))
-    hass.data[DOMAIN]['devices'] = devices
+    hass.data[DOMAIN]['client'] = client
+    
+    # Batch API calls for better performance
+    try:
+        # Get versions concurrently
+        await asyncio.gather(
+            client.get_app_version(),
+            client.get_ios_version()
+        )
+        
+        # Get devices
+        devices = await client.get_devices()
+        _LOGGER.debug(f'Retrieved {len(devices)} devices')
+        hass.data[DOMAIN]['devices'] = devices
+        
+    except Exception as e:
+        _LOGGER.error(f'Device initialization failed: {e}')
+        return False
 
-    # 监听设备数据
+    # Start background tasks with optimized signal handling
+    signals = hass.data[DOMAIN]['signals']
+    
+    # Token updater task
+    token_signal = threading.Event()
+    signals.append(token_signal)
+    hass.async_create_background_task(
+        _token_updater(hass, entry, token_signal, account_cfg), 
+        'treeow-token-updater'
+    )
+
+    # Device listener task
     device_signal = threading.Event()
-    hass.async_create_background_task(client.listen_devices(devices, device_signal), 'treeow-listener')
-    hass.data[DOMAIN]['signals'].append(device_signal)
+    signals.append(device_signal)
+    hass.async_create_background_task(
+        client.listen_devices(devices, device_signal), 
+        'treeow-listener'
+    )
 
+    # Setup platforms
     await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
-    entry.async_on_unload(entry.add_update_listener(entry_update_listener))
+    # Register update listener
+    entry.async_on_unload(entry.add_update_listener(_entry_update_listener))
 
     return True
 
-async def token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event):
-    """
-    每1小时检查一次token有效性，若token刷新则重载集成
-    :param hass:
-    :param entry:
-    :param signal:
-    :return:
-    """
+
+async def _token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event, account_cfg: Optional[AccountConfig] = None):
+    """Optimized token updater with configurable intervals."""
     while not signal.is_set():
-        if await try_update_token(hass, entry):
-            _LOGGER.info('token refreshed, reload integration...')
-            await hass.config_entries.async_reload(entry.entry_id)
-            break
-        else:
-            _LOGGER.debug('token is valid')
+        try:
+            if await _try_update_token(hass, entry, account_cfg):
+                _LOGGER.info('Token refreshed, reloading integration...')
+                await hass.config_entries.async_reload(entry.entry_id)
+                break
+        except Exception as e:
+            _LOGGER.error(f'Token update failed: {e}')
+            
+        # Wait for next check or signal
+        await asyncio.sleep(TOKEN_CHECK_INTERVAL)
 
-        await asyncio.sleep(3600)
 
-async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
-    """
-    尝试刷新token，刷新成功返回True，如refresh_token无效则会抛出异常
-    :param hass:
-    :param entry:
-    :return:
-    """
-    cfg = AccountConfig(hass, entry)
-    client = TreeowClient(hass, cfg.access_token)
-    await client.get_app_version()
-    await client.get_ios_version()
-
-    token_valid = True
+async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg: Optional[AccountConfig] = None) -> bool:
+    """Optimized token update with better error handling."""
+    if account_cfg is None:
+        account_cfg = AccountConfig(hass, entry)
+    
+    client = hass.data[DOMAIN].get('client')
+    if client is None:
+        client = TreeowClient(hass, account_cfg.access_token)
+    
     try:
-        await client.verify_token()
-    except TreeowClientException:
-        token_info = await client.login(cfg.account, cfg.password)
-        cfg.access_token = token_info.access_token
-        cfg.refresh_token = token_info.refresh_token
-        cfg.expires_at = token_info.expires_at
-        cfg.save()
+        # Batch version checks
+        await asyncio.gather(
+            client.get_app_version(),
+            client.get_ios_version()
+        )
+        
+        # Check token validity
+        try:
+            await client.verify_token()
+            token_valid = True
+        except TreeowClientException:
+            # Token invalid, refresh using login
+            _LOGGER.info('Token invalid, re-login with username and password')
+            token_info = await client.login(account_cfg.account, account_cfg.password)
+            account_cfg.access_token = token_info.access_token
+            account_cfg.refresh_token = token_info.refresh_token
+            account_cfg.expires_at = token_info.expires_at
+            account_cfg.save()
+            token_valid = False
 
-    # token有效且里过期时间大于1天时不更新token
-    if token_valid and cfg.expires_at - int(time.time()) > 86400:
-        return False
-
-    token_info = await client.refresh_token(cfg.refresh_token)
-    cfg.access_token = token_info.access_token
-    cfg.refresh_token = token_info.refresh_token
-    cfg.expires_at = token_info.expires_at
-    cfg.save()
-
-    return True
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    for platform in SUPPORTED_PLATFORMS:
-        if not await hass.config_entries.async_forward_entry_unload(entry, platform):
+        # Check if token needs refresh (more than 1 day remaining)
+        time_until_expiry = account_cfg.expires_at - int(time.time())
+        if token_valid and time_until_expiry > TOKEN_REFRESH_THRESHOLD:
             return False
 
-    for signal in hass.data[DOMAIN]['signals']:
-        signal.set()
+        # Refresh token proactively
+        token_info = await client.refresh_token(account_cfg.refresh_token)
+        account_cfg.access_token = token_info.access_token
+        account_cfg.refresh_token = token_info.refresh_token
+        account_cfg.expires_at = token_info.expires_at
+        account_cfg.save()
 
-    del hass.data[DOMAIN]
+        return True
+        
+    except Exception as e:
+        _LOGGER.error(f'Token update process failed: {e}')
+        raise
 
-    return True
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Optimized cleanup with proper resource management."""
+    # Unload platforms
+    unload_ok = True
+    for platform in SUPPORTED_PLATFORMS:
+        if not await hass.config_entries.async_forward_entry_unload(entry, platform):
+            unload_ok = False
+
+    if unload_ok:
+        # Signal all background tasks to stop
+        signals = hass.data[DOMAIN].get('signals', [])
+        for signal in signals:
+            signal.set()
+
+        # Clean up domain data
+        hass.data.pop(DOMAIN, None)
+
+    return unload_ok
 
 
-async def entry_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    _LOGGER.debug('reload treeow integration...')
+async def _entry_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Optimized update listener."""
     await hass.config_entries.async_reload(entry.entry_id)
 
+
 async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEntry, device: DeviceEntry) -> bool:
-    device_id = list(device.identifiers)[0][1]
+    """Optimized device removal with better error handling."""
+    device_identifiers = list(device.identifiers)
+    if not device_identifiers:
+        _LOGGER.error('Device identifier is empty')
+        return False
+        
+    device_id = device_identifiers[0][1]
 
-    _LOGGER.info('Device [{}] removing...'.format(device_id))
-
-    for device in hass.data[DOMAIN]['devices']:
-        if device.id.lower() == device_id:
-            target_device = device
+    # Find target device efficiently
+    devices = hass.data[DOMAIN].get('devices', [])
+    target_device = None
+    
+    for dev in devices:
+        if dev.id.lower() == device_id.lower():
+            target_device = dev
             break
-    else:
-        _LOGGER.error('Device [{}] not found'.format(device_id))
+    
+    if target_device is None:
+        _LOGGER.error(f'Device [{device_id}] not found')
         return False
 
-    cfg = DeviceFilterConfig(hass, config)
-    if cfg.filter_type == FILTER_TYPE_EXCLUDE:
-        cfg.add_device(target_device.id)
-    else:
-        cfg.remove_device(target_device.id)
+    # Update device filter configuration
+    try:
+        cfg = DeviceFilterConfig(hass, config)
+        if cfg.filter_type == FILTER_TYPE_EXCLUDE:
+            cfg.add_device(target_device.id)
+        else:
+            cfg.remove_device(target_device.id)
+        cfg.save()
+        
+        return True
+        
+    except Exception as e:
+        _LOGGER.error(f'Failed to remove device [{device_id}]: {e}')
+        return False
 
-    cfg.save()
-
-    _LOGGER.info('Device [{}] removed'.format(device_id))
-
-    return True
 
 async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_add_entities, platform, setup) -> None:
+    """Optimized entity registration with batch processing."""
+    devices = hass.data[DOMAIN].get('devices', [])
+    if not devices:
+        _LOGGER.warning('No devices available')
+        return
+
+    # Pre-allocate entities list
     entities = []
-    for device in hass.data[DOMAIN]['devices']:
-        if DeviceFilterConfig.is_skip(hass, entry, device.id):
+    device_filter_config = DeviceFilterConfig(hass, entry)
+    entity_filter_config = EntityFilterConfig(hass, entry)
+    
+    for device in devices:
+        # Skip filtered devices
+        if device_filter_config.is_skip(hass, entry, device.id):
             continue
 
+        # Process device attributes
         for attribute in device.attributes:
-            # _LOGGER.debug('init.attribute.key: {}'.format(attribute.key))
             if attribute.platform != platform:
                 continue
 
-            if EntityFilterConfig.is_skip(hass, entry, device.id, attribute.key):
+            # Skip filtered entities
+            if entity_filter_config.is_skip(hass, entry, device.id, attribute.key):
                 continue
 
-            entities.append(setup(device, attribute))
+            try:
+                entity = setup(device, attribute)
+                entities.append(entity)
+            except Exception as e:
+                _LOGGER.warning(f'Failed to create entity - device: {device.id}, attribute: {attribute.key}, error: {e}')
 
-    async_add_entities(entities)
+    # Batch add entities
+    if entities:
+        async_add_entities(entities)

@@ -63,8 +63,8 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        #self.config_entry = config_entry
-        super().__init__(config_entry)
+        # config_entry is now automatically available through the base class
+        super().__init__()
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """
@@ -168,7 +168,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         devices = {}
         for item in self.hass.data[DOMAIN]['devices']:
             devices[item.id] = item.name
-        # _LOGGER.debug('Device Info: {}'.format(devices))
         return self.async_show_form(
             step_id="entity_device_selector",
             data_schema=vol.Schema(
