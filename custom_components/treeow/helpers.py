@@ -12,7 +12,7 @@ def try_read_as_bool(value):
         # Only check string case for other string values
         return value.lower() == 'true'
     
-    raise ValueError(f'[{value}]无法被转为bool')
+    raise ValueError(f'[{value}] cannot be converted to bool')
 
 def equals_ignore_case(value, target):
     """Fast case-insensitive comparison with early returns."""

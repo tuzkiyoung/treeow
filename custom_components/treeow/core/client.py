@@ -6,7 +6,6 @@ import threading
 import time
 import uuid
 from typing import List, Dict, Optional, Any
-from functools import lru_cache
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -30,6 +29,8 @@ CACHE_EXPIRATION = 3600  # 1 hour
 HEARTBEAT_INTERVAL = 10  # seconds
 DEVICE_POLL_INTERVAL = 1  # seconds
 RETRY_DELAY = 5  # seconds
+RETRY_MULTIPLIER = 2  # retry delay multiplier
+MAX_RETRY_DELAY = 60  # seconds
 DEFAULT_PAGE_SIZE = 50
 
 
@@ -69,8 +70,8 @@ class TreeowClient:
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
-        self._app_version = '1.1.3'
-        self._ios_version = '18.3'
+        self._app_version = '1.1.8'
+        self._ios_version = '18.5'
         self._hass = hass
         self._session = async_get_clientsession(hass)
         self._header_cache = None
@@ -142,9 +143,12 @@ class TreeowClient:
                     data.get('refreshToken', ''),
                     int(time.time()) + int(data.get('expiresIn', 0))
                 )
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Login failed: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Login failed: {e}')
+            raise TreeowClientException(f'Login failed: {e}')
 
     async def refresh_token(self, refresh_token: str) -> TokenInfo:
         """Optimized token refresh."""
@@ -162,9 +166,12 @@ class TreeowClient:
                     data.get('refreshToken', ''),
                     int(time.time()) + int(data.get('expiresIn', 0))
                 )
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Token refresh failed: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Token refresh failed: {e}')
+            raise TreeowClientException(f'Token refresh failed: {e}')
 
     async def verify_token(self) -> None:
         """Optimized token verification."""
@@ -173,9 +180,12 @@ class TreeowClient:
             async with self._session.post(url=VERIFY_TOKEN_API, headers=headers, json={}) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
-        except Exception as e:
-            _LOGGER.error(f'Token verification failed: {e}')
+        except TreeowClientException as e:
+            _LOGGER.warning(f'Token verification failed: {e}')
             raise
+        except Exception as e:
+            _LOGGER.warning(f'Token verification failed: {e}')
+            raise TreeowClientException(f'Token verification failed: {e}')
 
     async def get_devices(self) -> List[TreeowDevice]:
         """Optimized device retrieval with parallel processing."""
@@ -204,9 +214,12 @@ class TreeowClient:
 
             return devices
             
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Failed to get device list: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Failed to get device list: {e}')
+            raise TreeowClientException(f'Failed to get device list: {e}')
 
     async def _get_devices_for_group(self, group_id: str, headers: Dict[str, str]) -> List[TreeowDevice]:
         """Helper method to get devices for a specific group."""
@@ -257,9 +270,12 @@ class TreeowClient:
                 
                 return group_ids
                 
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Failed to get device groups: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Failed to get device groups: {e}')
+            raise TreeowClientException(f'Failed to get device groups: {e}')
 
     async def get_digital_model(self, device: TreeowDevice) -> List[Dict[str, Any]]:
         """Optimized digital model retrieval."""
@@ -297,9 +313,12 @@ class TreeowClient:
                 
                 return []
                 
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Failed to get digital model for device {device.id}: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Failed to get digital model for device {device.id}: {e}')
+            raise TreeowClientException(f'Failed to get digital model for device {device.id}: {e}')
 
     async def get_digital_model_from_cache(self, device: TreeowDevice) -> List[Dict[str, Any]]:
         """Optimized cached digital model retrieval."""
@@ -364,17 +383,21 @@ class TreeowClient:
                 
                 return values
                 
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Failed to get snapshot data for device {device.id}: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Failed to get snapshot data for device {device.id}: {e}')
+            raise TreeowClientException(f'Failed to get snapshot data for device {device.id}: {e}')
 
     async def listen_devices(self, target_devices: List[TreeowDevice], signal: threading.Event) -> None:
-        """Optimized device listening with better resource management."""
+        """Optimized device listening with better resource management and exponential backoff retry."""
         process_id = str(uuid.uuid4())
         self._hass.data['current_listen_devices_process_id'] = process_id
         
         cancel_control_listen = None
         heartbeat_tasks = []
+        retry_delay = RETRY_DELAY  # Initial retry delay
         
         try:
             headers = await self._generate_common_headers()
@@ -412,10 +435,17 @@ class TreeowClient:
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
                     await asyncio.sleep(DEVICE_POLL_INTERVAL)
+                    
+                    # Reset retry delay on successful operation
+                    retry_delay = RETRY_DELAY
 
                 except Exception as e:
-                    _LOGGER.error(f'Device listening error: {e}')
-                    await asyncio.sleep(RETRY_DELAY)
+                    _LOGGER.error(f'Device listening error: {e}, retrying in {retry_delay} seconds')
+                    await asyncio.sleep(retry_delay)
+                    
+                    # Exponential backoff: double the delay for next retry
+                    retry_delay = min(retry_delay * RETRY_MULTIPLIER, MAX_RETRY_DELAY)
+                    _LOGGER.debug(f'Next retry delay set to {retry_delay} seconds')
 
         finally:
             # Cleanup
@@ -451,7 +481,9 @@ class TreeowClient:
             _LOGGER.error(f'Failed to poll device {device.id}: {e}')
 
     async def _send_heartbeat(self, device: TreeowDevice, event: threading.Event) -> None:
-        """Optimized heartbeat sending."""
+        """Optimized heartbeat sending with fast retry on failure."""
+        heartbeat_retry_delay = 1  # Start with 1 second for fast heartbeat recovery
+        
         while not event.is_set():
             try:
                 payload = {"value": 0}
@@ -468,10 +500,17 @@ class TreeowClient:
                     content = await response.json(content_type=None)
                     self._assert_response_successful(content)
                     
+                # Reset retry delay on successful heartbeat, then wait normal interval
+                heartbeat_retry_delay = 1
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                    
             except Exception as e:
-                _LOGGER.error(f'Device {device.id} heartbeat failed: {e}')
+                _LOGGER.error(f'Device {device.id} heartbeat failed: {e}, retrying in {heartbeat_retry_delay} seconds')
+                await asyncio.sleep(heartbeat_retry_delay)
                 
-            await asyncio.sleep(HEARTBEAT_INTERVAL)
+                # Fast retry with small increments, but don't exceed heartbeat interval
+                heartbeat_retry_delay = min(heartbeat_retry_delay * 2, HEARTBEAT_INTERVAL)
+                _LOGGER.debug(f'Device {device.id} heartbeat next retry delay set to {heartbeat_retry_delay} seconds')
 
     async def _parse_message(self, device: TreeowDevice, msg: Dict[str, Any]) -> None:
         """Optimized message parsing."""
@@ -527,12 +566,15 @@ class TreeowClient:
                 self._assert_response_successful(content)
                 
                 if content.get('data') != value:
-                    message = content.get('meta', {}).get('message', '未知错误')
-                    raise TreeowClientException(f'命令发送异常: {message}')
+                    message = content.get('meta', {}).get('message', 'Unknown error')
+                    raise TreeowClientException(f'Command send failed: {message}')
                     
-        except Exception as e:
+        except TreeowClientException as e:
             _LOGGER.error(f'Failed to send command: {e}')
             raise
+        except Exception as e:
+            _LOGGER.error(f'Failed to send command: {e}')
+            raise TreeowClientException(f'Failed to send command: {e}')
 
     async def _generate_common_headers(self) -> Dict[str, str]:
         """Optimized header generation with caching."""
@@ -553,14 +595,14 @@ class TreeowClient:
         """Optimized response validation."""
         if 'meta' in resp:
             meta = resp['meta']
-            if int(meta.get('code', 0)) != 200 or '错误' in str(meta):
-                raise TreeowClientException(f'接口返回异常: {meta.get("message", "未知错误")}')
+            if int(meta.get('code', 0)) != 200 or 'error' in str(meta):
+                raise TreeowClientException(f'API response error: {meta.get("message", "Unknown error")}')
         elif 'result' in resp:
             result = resp['result']
             if int(result.get('code', 0)) != 200 or 'error' in str(result):
-                raise TreeowClientException(f'接口返回异常: {result.get("msg", "未知错误")}')
+                raise TreeowClientException(f'API response error: {result.get("msg", "Unknown error")}')
         else:
             code = resp.get('code', 0)
             msg = resp.get('msg', '')
-            if int(code) != 200 or '错误' in msg:
-                raise TreeowClientException(f'接口返回异常: {msg or "未知错误"}')
+            if int(code) != 200 or 'error' in msg:
+                raise TreeowClientException(f'API response error: {msg or "Unknown error"}')

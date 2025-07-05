@@ -2,15 +2,14 @@ import asyncio
 import logging
 import threading
 import time
-from typing import List, Optional
+from typing import Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .const import DOMAIN, SUPPORTED_PLATFORMS, FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE
-from .core.attribute import TreeowAttribute
-from .core.client import TreeowClient, EVENT_DEVICE_DATA_CHANGED, TreeowClientException, TokenInfo
+from .const import DOMAIN, SUPPORTED_PLATFORMS, FILTER_TYPE_EXCLUDE
+from .core.client import TreeowClient, TreeowClientException
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
 from .core.device import TreeowDevice
 
@@ -19,6 +18,9 @@ _LOGGER = logging.getLogger(__name__)
 # Constants for optimization
 TOKEN_CHECK_INTERVAL = 3600  # 1 hour
 TOKEN_REFRESH_THRESHOLD = 86400  # 1 day
+TOKEN_RETRY_DELAY = 30  # seconds (initial retry delay for token operations)
+TOKEN_RETRY_MULTIPLIER = 2  # retry delay multiplier
+TOKEN_MAX_RETRY_DELAY = 300  # seconds (5 minutes max retry delay)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -86,15 +88,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event, account_cfg: Optional[AccountConfig] = None):
-    """Optimized token updater with configurable intervals."""
+    """Optimized token updater with exponential backoff retry."""
+    token_retry_delay = TOKEN_RETRY_DELAY
+    
     while not signal.is_set():
         try:
             if await _try_update_token(hass, entry, account_cfg):
                 _LOGGER.info('Token refreshed, reloading integration...')
                 await hass.config_entries.async_reload(entry.entry_id)
                 break
+            
+            # Reset retry delay on successful token update
+            token_retry_delay = TOKEN_RETRY_DELAY
+            
         except Exception as e:
-            _LOGGER.error(f'Token update failed: {e}')
+            _LOGGER.error(f'Token update failed: {e}, retrying in {token_retry_delay} seconds')
+            
+            # Wait with exponential backoff
+            await asyncio.sleep(token_retry_delay)
+            
+            # Exponential backoff: double the delay for next retry
+            token_retry_delay = min(token_retry_delay * TOKEN_RETRY_MULTIPLIER, TOKEN_MAX_RETRY_DELAY)
+            _LOGGER.debug(f'Token updater next retry delay set to {token_retry_delay} seconds')
+            continue
             
         # Wait for next check or signal
         await asyncio.sleep(TOKEN_CHECK_INTERVAL)
