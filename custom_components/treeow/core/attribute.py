@@ -23,6 +23,7 @@ EXCLUDED_ATTRIBUTES = frozenset(('wifi_info', 'timestamp'))
 SENSOR_KEYWORDS = {
     '累计': (SensorStateClass.TOTAL, None, None),
     '天数': (SensorStateClass.MEASUREMENT, SensorDeviceClass.DURATION, UnitOfTime.DAYS),
+    '小时': (SensorStateClass.MEASUREMENT, SensorDeviceClass.DURATION, UnitOfTime.HOURS),
     '温度': (None, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS),
     '湿度': (None, SensorDeviceClass.HUMIDITY, PERCENTAGE),
     '寿命': (None, SensorDeviceClass.BATTERY, PERCENTAGE),
