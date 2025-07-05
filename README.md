@@ -5,6 +5,8 @@
 [![GitHub Stars](https://img.shields.io/github/stars/tuzkiyoung/treeow.svg)](https://github.com/tuzkiyoung/treeow/stargazers)
 [![License](https://img.shields.io/github/license/tuzkiyoung/treeow.svg)](LICENSE)
 
+[![Validate](https://github.com/tuzkiyoung/treeow/actions/workflows/validate.yml/badge.svg)](https://github.com/tuzkiyoung/treeow/actions/workflows/validate.yml)
+
 [English](#english) | [中文](#中文)
 
 ## English

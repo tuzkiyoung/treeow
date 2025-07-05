@@ -1,0 +1,30 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  hassfest:
+    runs-on: "ubuntu-latest"
+    name: Check with hassfest
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v4"
+
+      - name: "Run hassfest"
+        uses: "home-assistant/actions/hassfest@master"
+
+  hacs:
+    runs-on: "ubuntu-latest"
+    name: Check with HACS Action
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v4"
+
+      - name: "Run HACS Action"
+        uses: "hacs/action@main"
+        with:
+          category: "integration" 
