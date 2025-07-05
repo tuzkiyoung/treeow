@@ -27,6 +27,9 @@ SENSOR_KEYWORDS = {
     '湿度': (None, SensorDeviceClass.HUMIDITY, PERCENTAGE),
     '寿命': (None, SensorDeviceClass.BATTERY, PERCENTAGE),
     '甲醛': (SensorStateClass.MEASUREMENT, SensorDeviceClass.AQI, None),
+    '水位': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
+    '水量': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
+    '液位': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
 }
 
 IDENTIFIER_MAPPINGS = {
