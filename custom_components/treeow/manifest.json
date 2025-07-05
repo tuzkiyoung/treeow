@@ -1,16 +1,16 @@
 {
   "domain": "treeow",
   "name": "Treeow",
-  "version": "1.0.0",
-  "documentation": "https://github.com/tuzkiyoung/treeow",
-  "issue_tracker": "https://github.com/tuzkiyoung/treeow/issues",
-  "config_flow": true,
-  "integration_type": "hub",
-  "iot_class": "cloud_polling",
-  "requirements": [],
-  "dependencies": [],
   "codeowners": [
     "@tuzkiyoung"
   ],
-  "quality_scale": "silver"
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/tuzkiyoung/treeow",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/tuzkiyoung/treeow/issues",
+  "quality_scale": "silver",
+  "requirements": [],
+  "version": "1.0.0"
 }
