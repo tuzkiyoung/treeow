@@ -25,8 +25,6 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # 登录获取token
                 client = TreeowClient(self.hass, '')
-                await client.get_app_version()
-                await client.get_ios_version()
                 token_info = await client.login(user_input[account], user_input[password])
 
                 return self.async_create_entry(title="Treeow-{}".format(user_input[account]), data={
@@ -91,8 +89,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             try:
                 # 获取token
                 client = TreeowClient(self.hass, '')
-                await client.get_app_version()
-                await client.get_ios_version()
                 token_info = await client.login(user_input[account], user_input[password])
 
                 cfg.account = user_input[account]

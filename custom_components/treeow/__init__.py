@@ -42,14 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = TreeowClient(hass, account_cfg.access_token)
     hass.data[DOMAIN]['client'] = client
     
-    # Batch API calls for better performance
     try:
-        # Get versions concurrently
-        await asyncio.gather(
-            client.get_app_version(),
-            client.get_ios_version()
-        )
-        
         # Get devices
         devices = await client.get_devices()
         _LOGGER.debug(f'Retrieved {len(devices)} devices')
@@ -126,12 +119,6 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
         client = TreeowClient(hass, account_cfg.access_token)
     
     try:
-        # Batch version checks
-        await asyncio.gather(
-            client.get_app_version(),
-            client.get_ios_version()
-        )
-        
         # Check token validity
         try:
             await client.verify_token()

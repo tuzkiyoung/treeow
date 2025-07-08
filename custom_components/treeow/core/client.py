@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 import uuid
@@ -66,7 +67,7 @@ class TreeowClient:
     """Optimized TreeowClient with improved performance and error handling."""
 
     __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', 
-                 '_header_cache', '_group_cache', '_group_cache_time')
+                 '_header_cache', '_group_cache', '_group_cache_time', '_versions_initialized')
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
@@ -77,10 +78,35 @@ class TreeowClient:
         self._header_cache = None
         self._group_cache = None
         self._group_cache_time = 0
+        self._versions_initialized = False
 
     @property
     def hass(self) -> HomeAssistant:
         return self._hass
+
+    async def initialize_versions(self) -> None:
+        """Initialize versions once during service startup."""
+        if self._versions_initialized:
+            return
+            
+        try:
+            # Get versions concurrently for better performance
+            await asyncio.gather(
+                self.get_app_version(),
+                self.get_ios_version()
+            )
+            
+            if not self._app_version.replace('.', '').isdigit():
+                _LOGGER.warning(f'Invalid app version format: {self._app_version}, using default')
+                self._app_version = '1.1.8'
+            
+            if not self._ios_version.replace('.', '').isdigit():
+                _LOGGER.warning(f'Invalid iOS version format: {self._ios_version}, using default')
+                self._ios_version = '18.5'
+            
+            self._versions_initialized = True
+        except Exception as e:
+            _LOGGER.warning(f'Failed to initialize versions: {e}')
 
     async def get_app_version(self) -> None:
         """Get app version with optimized error handling."""
@@ -112,6 +138,7 @@ class TreeowClient:
                                         self._ios_version = version_part.split('(')[0]
                                     else:
                                         self._ios_version = version_part
+                                    
                                     self._header_cache = None  # Invalidate cache
                                     return
         except Exception as e:
@@ -577,7 +604,9 @@ class TreeowClient:
             raise TreeowClientException(f'Failed to send command: {e}')
 
     async def _generate_common_headers(self) -> Dict[str, str]:
-        """Optimized header generation with caching."""
+        """Optimized header generation with caching and version auto-initialization."""
+        if not self._versions_initialized:
+            await self.initialize_versions()
         if self._header_cache is None:
             self._header_cache = {
                 "content-type": "application/json;charset=utf8",
