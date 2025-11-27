@@ -191,6 +191,7 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
     target_device = None
     
     for dev in devices:
+        _LOGGER.debug(f'Device ID: {dev.id}, Device ID: {device_id}')
         if dev.id.lower() == device_id.lower():
             target_device = dev
             break
