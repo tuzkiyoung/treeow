@@ -31,9 +31,9 @@
 
 | Device | Type | Status |
 |--------|------|--------|
-| T3 | Air Purifier (空气净化器) | ✅ Tested |
-| K3 | Air Purifier (空气净化器) | ✅ Tested |
-| G2 | Humidifier (加湿器) | ✅ Tested |
+| T3 | Air Purifier | ✅ Tested |
+| K3 | Air Purifier| ✅ Tested |
+| G2 | Humidifier  | ✅ Tested |
 
 *Other Treeow Home devices should also work. Please report your experience!*
 
