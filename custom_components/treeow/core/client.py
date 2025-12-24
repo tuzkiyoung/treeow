@@ -650,16 +650,14 @@ class TreeowClient:
         if self._header_cache is None:
             self._header_cache = {
                 "content-type": "application/json;charset=utf8",
+                "authorization": f"Bearer {self._access_token}",
                 "accept": "*/*",
                 "accept-encoding": "gzip, deflate, br",
                 "accept-language": "zh-Hans-CN;q=1, en-US;q=0.9",
                 "clienttype": "2",
                 "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
             }
-        headers = self._header_cache.copy()
-        # Always use current token to avoid stale authorization
-        headers["authorization"] = f"Bearer {self._access_token}"
-        return headers
+        return self._header_cache.copy()
 
     @staticmethod
     def _assert_response_successful(resp: Dict[str, Any]) -> None:
