@@ -135,7 +135,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         devices = {}
 
-        for item in self.hass.data[DOMAIN]['devices']:
+        for item in self.hass.data.get(DOMAIN, {}).get('devices', []):
             devices[item.id] = item.name
 
         return self.async_show_form(
@@ -158,11 +158,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         :return:
         """
         if user_input is not None:
-            self.hass.data[DOMAIN]['entity_filter_target_device'] = user_input['target_device']
+            self.hass.data.setdefault(DOMAIN, {})['entity_filter_target_device'] = user_input['target_device']
             return await self.async_step_entity_filter()
 
         devices = {}
-        for item in self.hass.data[DOMAIN]['devices']:
+        for item in self.hass.data.get(DOMAIN, {}).get('devices', []):
             devices[item.id] = item.name
         return self.async_show_form(
             step_id="entity_device_selector",
@@ -190,12 +190,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             return self.async_create_entry(title='', data={})
 
-        target_device_id = self.hass.data[DOMAIN].pop('entity_filter_target_device', '')
-        for device in self.hass.data[DOMAIN]['devices']:
+        domain_data = self.hass.data.get(DOMAIN, {})
+        target_device_id = domain_data.pop('entity_filter_target_device', '')
+        target_device = None
+        for device in domain_data.get('devices', []):
             if device.id == target_device_id:
                 target_device = device
                 break
-        else:
+        
+        if target_device is None:
             raise ValueError('Device [{}] not found'.format(target_device_id))
 
         entities = {}

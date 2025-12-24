@@ -50,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
     except Exception as e:
         _LOGGER.error(f'Device initialization failed: {e}')
+        hass.data.pop(DOMAIN, None)
         return False
 
     # Start background tasks with optimized signal handling
@@ -122,7 +123,6 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
         # Check token validity
         try:
             await client.verify_token()
-            token_valid = True
         except TreeowClientException:
             # Token invalid, refresh using login
             _LOGGER.info('Token invalid, re-login with username and password')
@@ -131,11 +131,11 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
             account_cfg.refresh_token = token_info.refresh_token
             account_cfg.expires_at = token_info.expires_at
             account_cfg.save()
-            token_valid = False
+            return True
 
-        # Check if token needs refresh (more than 1 day remaining)
+        # Check if token needs refresh (less than 1 day remaining)
         time_until_expiry = account_cfg.expires_at - int(time.time())
-        if token_valid and time_until_expiry > TOKEN_REFRESH_THRESHOLD:
+        if time_until_expiry > TOKEN_REFRESH_THRESHOLD:
             return False
 
         # Refresh token proactively
@@ -154,11 +154,12 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Optimized cleanup with proper resource management."""
-    # Unload platforms
-    unload_ok = True
-    for platform in SUPPORTED_PLATFORMS:
-        if not await hass.config_entries.async_forward_entry_unload(entry, platform):
-            unload_ok = False
+    # Unload platforms in parallel for faster cleanup
+    unload_results = await asyncio.gather(
+        *[hass.config_entries.async_forward_entry_unload(entry, platform) for platform in SUPPORTED_PLATFORMS],
+        return_exceptions=True
+    )
+    unload_ok = all(result is True for result in unload_results)
 
     if unload_ok:
         # Signal all background tasks to stop
@@ -230,7 +231,7 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
     
     for device in devices:
         # Skip filtered devices
-        if device_filter_config.is_skip(hass, entry, device.id):
+        if device_filter_config.is_skip(device.id):
             continue
 
         # Process device attributes
@@ -239,7 +240,7 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
                 continue
 
             # Skip filtered entities
-            if entity_filter_config.is_skip(hass, entry, device.id, attribute.key):
+            if entity_filter_config.is_skip(device.id, attribute.key):
                 continue
 
             try:

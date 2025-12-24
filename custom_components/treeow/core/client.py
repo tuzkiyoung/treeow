@@ -2,14 +2,12 @@ import asyncio
 import hashlib
 import json
 import logging
-import re
 import threading
 import time
 import uuid
 from typing import List, Dict, Optional, Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.storage import Store
 from .device import TreeowDevice
 from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
@@ -462,8 +460,6 @@ class TreeowClient:
         cache_cleanup_counter = 0  # 缓存清理计数器
         
         try:
-            headers = await self._generate_common_headers()
-            
             # Start heartbeat tasks
             for device in target_devices:
                 heartbeat_signal = threading.Event()
@@ -489,6 +485,9 @@ class TreeowClient:
             # Main listening loop
             while not signal.is_set():
                 try:
+                    # Refresh headers each iteration to ensure token is current
+                    headers = await self._generate_common_headers()
+                    
                     # Poll devices concurrently for better performance
                     tasks = []
                     for device in target_devices:
@@ -651,14 +650,16 @@ class TreeowClient:
         if self._header_cache is None:
             self._header_cache = {
                 "content-type": "application/json;charset=utf8",
-                "authorization": f"Bearer {self._access_token}",
                 "accept": "*/*",
                 "accept-encoding": "gzip, deflate, br",
                 "accept-language": "zh-Hans-CN;q=1, en-US;q=0.9",
                 "clienttype": "2",
                 "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
             }
-        return self._header_cache.copy()
+        headers = self._header_cache.copy()
+        # Always use current token to avoid stale authorization
+        headers["authorization"] = f"Bearer {self._access_token}"
+        return headers
 
     @staticmethod
     def _assert_response_successful(resp: Dict[str, Any]) -> None:

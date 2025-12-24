@@ -135,8 +135,8 @@ class V1SpecAttributeParser(TreeowAttributeParser):
 
     def parse_global(self, attributes: List[dict]):
         """Optimized global attribute parsing."""
-        # Use set for O(1) lookup
-        attribute_keys = {attr['identifier'] for attr in attributes}
+        # Use set for O(1) lookup, filter out attributes without identifier
+        attribute_keys = {attr.get('identifier') for attr in attributes if attr.get('identifier')}
         
         # Check for air purifier pattern
         if {'pm25', 'filter', 'fan'}.issubset(attribute_keys):
@@ -149,7 +149,7 @@ class V1SpecAttributeParser(TreeowAttributeParser):
     def _parse_as_fan(self, attribute: dict) -> TreeowAttribute:
         """Optimized fan parsing."""
         display_name = self._get_display_name(attribute.get('title', ''))
-        return TreeowAttribute(attribute['identifier'], display_name, Platform.SENSOR)
+        return TreeowAttribute(attribute['identifier'], display_name, Platform.FAN)
 
     def _parse_as_sensor(self, attribute: dict) -> TreeowAttribute:
         """Optimized sensor parsing with cached lookups."""

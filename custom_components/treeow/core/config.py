@@ -14,29 +14,17 @@ class AccountConfig:
     账户配置
     """
 
-    account: str = None
-
-    password: str = None
-
-    access_token: str = None
-
-    refresh_token: str = None
-
-    expires_at: int = None
-
-    default_load_all_entity: bool = None
-
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
 
         cfg = config.data.get('account', {})
-        self.account = cfg.get('account', '')
-        self.password = cfg.get('password', '')
-        self.access_token = cfg.get('access_token', '')
-        self.refresh_token = cfg.get('refresh_token', '')
-        self.expires_at = cfg.get('expires_at', 0)
-        self.default_load_all_entity = cfg.get('default_load_all_entity', True)
+        self.account: str = cfg.get('account', '')
+        self.password: str = cfg.get('password', '')
+        self.access_token: str = cfg.get('access_token', '')
+        self.refresh_token: str = cfg.get('refresh_token', '')
+        self.expires_at: int = cfg.get('expires_at', 0)
+        self.default_load_all_entity: bool = cfg.get('default_load_all_entity', True)
 
     def save(self):
         self._hass.config_entries.async_update_entry(
@@ -60,17 +48,16 @@ class DeviceFilterConfig:
     """
     设备筛选配置
     """
-    _filter_type: str
-
-    _target_devices: List[str]
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
 
         cfg = config.data.get('device_filter', {})
-        self._filter_type = cfg.get('filter_type', FILTER_TYPE_EXCLUDE)
-        self._target_devices = cfg.get('target_devices', [])
+        self._filter_type: str = cfg.get('filter_type', FILTER_TYPE_EXCLUDE)
+        self._target_devices: List[str] = cfg.get('target_devices', [])
+        # Cache set for O(1) lookup performance
+        self._target_devices_set: set = set(self._target_devices)
 
     def set_filter_type(self, filter_type: str):
         if filter_type not in [FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE]:
@@ -86,25 +73,29 @@ class DeviceFilterConfig:
         if not isinstance(devices, list):
             raise ValueError()
         self._target_devices = devices
+        self._target_devices_set = set(devices)
 
     @property
     def target_devices(self):
         return self._target_devices
 
     def add_device(self, device: str):
-        if device not in self._target_devices:
+        if device not in self._target_devices_set:
             self._target_devices.append(device)
+            self._target_devices_set.add(device)
 
     def remove_device(self, device: str):
-        self._target_devices.remove(device)
+        if device in self._target_devices_set:
+            self._target_devices.remove(device)
+            self._target_devices_set.discard(device)
 
-    @staticmethod
-    def is_skip(hass: HomeAssistant, config: ConfigEntry, device_id: str) -> bool:
-        cfg = DeviceFilterConfig(hass, config)
-        if cfg.filter_type == FILTER_TYPE_EXCLUDE:
-            return device_id in cfg.target_devices
+    def is_skip(self, device_id: str) -> bool:
+        """Check if a device should be skipped based on filter configuration."""
+        # Use set for O(1) lookup
+        if self._filter_type == FILTER_TYPE_EXCLUDE:
+            return device_id in self._target_devices_set
         else:
-            return device_id not in cfg.target_devices
+            return device_id not in self._target_devices_set
 
     def save(self):
         self._hass.config_entries.async_update_entry(
@@ -123,61 +114,65 @@ class EntityFilterConfig:
     """
     实体筛选配置
     """
-    _cfg: List[dict] = []
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
         self._account_cfg = AccountConfig(hass, config)
-        self._cfg = config.data.get('entity_filter', [])
+        self._cfg: List[dict] = config.data.get('entity_filter', [])
+        # Build index for O(1) lookup
+        self._cfg_index: dict = {item['device_id']: item for item in self._cfg}
 
     def set_filter_type(self, device_id: str, filter_type: str):
         if filter_type not in [FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE]:
             raise ValueError()
 
-        for index, item in enumerate(self._cfg):
-            if item['device_id'] == device_id:
-                self._cfg[index]['filter_type'] = filter_type
-                break
+        if device_id in self._cfg_index:
+            self._cfg_index[device_id]['filter_type'] = filter_type
         else:
-            self._cfg.append(self._generate_entity_filer_item(device_id, filter_type=filter_type))
+            item = self._generate_entity_filer_item(device_id, filter_type=filter_type)
+            self._cfg.append(item)
+            self._cfg_index[device_id] = item
 
     def get_filter_type(self, device_id: str) -> str:
-        for item in self._cfg:
-            if item['device_id'] == device_id:
-                return item['filter_type']
-        else:
-            return FILTER_TYPE_EXCLUDE if self._account_cfg.default_load_all_entity else FILTER_TYPE_INCLUDE
+        if device_id in self._cfg_index:
+            return self._cfg_index[device_id]['filter_type']
+        return FILTER_TYPE_EXCLUDE if self._account_cfg.default_load_all_entity else FILTER_TYPE_INCLUDE
 
     def set_target_entities(self, device_id: str, entities: List[str]):
         if not isinstance(entities, list):
             raise ValueError()
 
-        for index, item in enumerate(self._cfg):
-            if item['device_id'] == device_id:
-                self._cfg[index]['target_entities'] = entities
-                break
+        if device_id in self._cfg_index:
+            self._cfg_index[device_id]['target_entities'] = entities
         else:
-            self._cfg.append(self._generate_entity_filer_item(device_id, target_entities=entities))
+            item = self._generate_entity_filer_item(device_id, target_entities=entities)
+            self._cfg.append(item)
+            self._cfg_index[device_id] = item
 
     def get_target_entities(self, device_id: str) -> List[str]:
-        for item in self._cfg:
-            if item['device_id'] == device_id:
-                return item['target_entities']
+        if device_id in self._cfg_index:
+            return self._cfg_index[device_id]['target_entities']
+        return []
+
+    def is_skip(self, device_id: str, attr: str) -> bool:
+        """Check if an entity should be skipped based on filter configuration."""
+        # O(1) lookup using index
+        if device_id in self._cfg_index:
+            item = self._cfg_index[device_id]
+            filter_type = item['filter_type']
+            target_entities = item['target_entities']
+            if filter_type == FILTER_TYPE_EXCLUDE:
+                return attr in target_entities
+            else:
+                return attr not in target_entities
+        
+        # Device not in config, use default
+        default_filter = FILTER_TYPE_EXCLUDE if self._account_cfg.default_load_all_entity else FILTER_TYPE_INCLUDE
+        if default_filter == FILTER_TYPE_EXCLUDE:
+            return False  # Empty exclude list means include all
         else:
-            return []
-
-    @staticmethod
-    def is_skip(hass: HomeAssistant, config: ConfigEntry, device_id: str, attr: str) -> bool:
-        cfg = EntityFilterConfig(hass, config)
-
-        filter_type = cfg.get_filter_type(device_id)
-        target_entities = cfg.get_target_entities(device_id)
-
-        if filter_type == FILTER_TYPE_EXCLUDE:
-            return attr in target_entities
-        else:
-            return attr not in target_entities
+            return True  # Empty include list means exclude all
 
     def save(self):
         self._hass.config_entries.async_update_entry(
@@ -192,9 +187,9 @@ class EntityFilterConfig:
         )
 
     @staticmethod
-    def _generate_entity_filer_item(device_id: str, filter_type: str = FILTER_TYPE_INCLUDE, entities: List[str] = []):
+    def _generate_entity_filer_item(device_id: str, filter_type: str = FILTER_TYPE_INCLUDE, entities: List[str] = None):
         return {
             'device_id': device_id,
             'filter_type': filter_type,
-            'target_entities': entities
+            'target_entities': entities if entities is not None else []
         }
