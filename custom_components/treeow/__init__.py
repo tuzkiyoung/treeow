@@ -197,8 +197,8 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
             break
     
     if target_device is None:
-        _LOGGER.error(f'Device [{device_id}] not found')
-        return False
+        _LOGGER.warning(f'Device [{device_id}] not found in app, allowing removal from Home Assistant')
+        return True
 
     # Update device filter configuration
     try:
