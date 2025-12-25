@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 import uuid
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .device import TreeowDevice
@@ -140,7 +140,7 @@ class TreeowClient:
     async def login(self, account: str, password: str) -> TokenInfo:
         """Optimized login with better error handling."""
         try:
-            headers = await self._generate_common_headers()
+            headers = (await self._generate_common_headers()).copy()
             headers.pop("authorization", None)  # Safe removal
             
             terminal_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, account)).upper()
@@ -473,12 +473,12 @@ class TreeowClient:
             # Signal gateway is online
             fire_event(self._hass, EVENT_GATEWAY_STATUS_CHANGED, {'status': True})
 
+            # Generate headers once before loop (token refresh will reload integration)
+            headers = await self._generate_common_headers()
+
             # Main listening loop
             while not signal.is_set():
                 try:
-                    # Refresh headers each iteration to ensure token is current
-                    headers = await self._generate_common_headers()
-                    
                     # Poll devices concurrently for better performance
                     tasks = []
                     for device in target_devices:
@@ -542,18 +542,19 @@ class TreeowClient:
         """Optimized heartbeat sending with fast retry on failure."""
         heartbeat_retry_delay = 1  # Start with 1 second for fast heartbeat recovery
         
+        # Prepare fixed payload and headers once before loop
+        payload = {"value": 0}
+        headers = (await self._generate_common_headers()).copy()
+        headers.update({
+            'domainidentifier': str(device.category or ''),
+            'propidentifier': 'online_state',
+            'localindex': str(device.localIndex or ''),
+            'deviceserial': str(device.device_serial or ''),
+            'resourcecategory': str(device.resourceCategory or '')
+        })
+        
         while not event.is_set():
             try:
-                payload = {"value": 0}
-                headers = await self._generate_common_headers()
-                headers.update({
-                    'domainidentifier': str(device.category or ''),
-                    'propidentifier': 'online_state',
-                    'localindex': str(device.localIndex or ''),
-                    'deviceserial': str(device.device_serial or ''),
-                    'resourcecategory': str(device.resourceCategory or '')
-                })
-                
                 async with self._session.put(url=SYNC_DEVICES_API, json=payload, headers=headers) as response:
                     content = await response.json(content_type=None)
                     self._assert_response_successful(content)
@@ -604,7 +605,7 @@ class TreeowClient:
             value = command[identifier]
             
             payload = {"value": value}
-            headers = await self._generate_common_headers()
+            headers = (await self._generate_common_headers()).copy()
             headers.update({
                 'domainidentifier': str(device.get('category', '')),
                 'propidentifier': str(identifier),
@@ -648,7 +649,7 @@ class TreeowClient:
                 "clienttype": "2",
                 "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
             }
-        return self._header_cache.copy()
+        return self._header_cache
 
     @staticmethod
     def _assert_response_successful(resp: Dict[str, Any]) -> None:

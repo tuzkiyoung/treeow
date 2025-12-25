@@ -11,7 +11,6 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from .const import DOMAIN, SUPPORTED_PLATFORMS, FILTER_TYPE_EXCLUDE
 from .core.client import TreeowClient, TreeowClientException
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
-from .core.device import TreeowDevice
 
 _LOGGER = logging.getLogger(__name__)
 

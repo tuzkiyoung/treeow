@@ -1,7 +1,7 @@
 import json
 import logging
 from abc import abstractmethod, ABC
-from typing import List, Dict, Tuple, Optional
+from typing import List, Tuple, Optional
 from functools import lru_cache
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass

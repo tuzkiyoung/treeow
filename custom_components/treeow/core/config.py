@@ -56,8 +56,6 @@ class DeviceFilterConfig:
         cfg = config.data.get('device_filter', {})
         self._filter_type: str = cfg.get('filter_type', FILTER_TYPE_EXCLUDE)
         self._target_devices: List[str] = cfg.get('target_devices', [])
-        # Cache set for O(1) lookup performance
-        self._target_devices_set: set = set(self._target_devices)
 
     def set_filter_type(self, filter_type: str):
         if filter_type not in [FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE]:
@@ -73,29 +71,25 @@ class DeviceFilterConfig:
         if not isinstance(devices, list):
             raise ValueError()
         self._target_devices = devices
-        self._target_devices_set = set(devices)
 
     @property
     def target_devices(self):
         return self._target_devices
 
     def add_device(self, device: str):
-        if device not in self._target_devices_set:
+        if device not in self._target_devices:
             self._target_devices.append(device)
-            self._target_devices_set.add(device)
 
     def remove_device(self, device: str):
-        if device in self._target_devices_set:
+        if device in self._target_devices:
             self._target_devices.remove(device)
-            self._target_devices_set.discard(device)
 
     def is_skip(self, device_id: str) -> bool:
         """Check if a device should be skipped based on filter configuration."""
-        # Use set for O(1) lookup
         if self._filter_type == FILTER_TYPE_EXCLUDE:
-            return device_id in self._target_devices_set
+            return device_id in self._target_devices
         else:
-            return device_id not in self._target_devices_set
+            return device_id not in self._target_devices
 
     def save(self):
         self._hass.config_entries.async_update_entry(
@@ -120,7 +114,6 @@ class EntityFilterConfig:
         self._config = config
         self._account_cfg = AccountConfig(hass, config)
         self._cfg: List[dict] = config.data.get('entity_filter', [])
-        # Build index for O(1) lookup
         self._cfg_index: dict = {item['device_id']: item for item in self._cfg}
 
     def set_filter_type(self, device_id: str, filter_type: str):
@@ -187,9 +180,9 @@ class EntityFilterConfig:
         )
 
     @staticmethod
-    def _generate_entity_filer_item(device_id: str, filter_type: str = FILTER_TYPE_INCLUDE, entities: List[str] = None):
+    def _generate_entity_filer_item(device_id: str, filter_type: str = FILTER_TYPE_INCLUDE, target_entities: List[str] = None):
         return {
             'device_id': device_id,
             'filter_type': filter_type,
-            'target_entities': entities if entities is not None else []
+            'target_entities': target_entities if target_entities is not None else []
         }
