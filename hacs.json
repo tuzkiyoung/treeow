@@ -1,7 +1,5 @@
 {
   "name": "Treeow",
   "render_readme": true,
-  "filename": "treeow.zip",
-  "hide_default_branch": true,
   "homeassistant": "2023.1.0"
 }
