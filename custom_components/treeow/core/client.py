@@ -2,14 +2,12 @@ import asyncio
 import hashlib
 import json
 import logging
-import re
 import threading
 import time
 import uuid
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.storage import Store
 from .device import TreeowDevice
 from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
@@ -24,7 +22,7 @@ SYNC_DEVICES_API = 'https://eziotes.treeow.com.cn/api/v3/device/otap/prop'
 LIST_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/v3/device/list/page'
 LIST_HOME_API = 'https://eziotes.treeow.com.cn/api/resource/home/list'
 GET_APP_VERSION_API = 'https://itunes.apple.com/cn/lookup?id=6505056723'
-GET_IOS_VERSION_API = 'https://api.ipsw.me/v4/releases'
+GET_IOS_VERSION_API = 'https://endoflife.date/api/v1/products/ios/releases/latest'
 
 CACHE_EXPIRATION = 3600  # 1 hour
 HEARTBEAT_INTERVAL = 10  # seconds
@@ -120,38 +118,29 @@ class TreeowClient:
                 results = content.get('results', [])
                 if results and results[0].get('trackName') == 'Treeow Home':
                     self._app_version = results[0].get('version', self._app_version)
-                    self._header_cache = None  # Invalidate cache
         except Exception as e:
             _LOGGER.warning(f'Failed to get app version: {e}')
 
     async def get_ios_version(self) -> None:
-        """Get iOS version with optimized parsing."""
+        """Get latest iOS version from endoflife.date API."""
         try:
             async with self._session.get(url=GET_IOS_VERSION_API) as response:
                 content = await response.json(content_type=None)
                 if content:
-                    # More efficient version parsing
-                    for item in content:
-                        releases = item.get('releases', [])
-                        for release in releases:
-                            if release.get('type') == 'iOS':
-                                name = release.get('name', '')
-                                if name and ' ' in name:
-                                    version_part = name.split(' ')[1]
-                                    if '(' in version_part:
-                                        self._ios_version = version_part.split('(')[0]
-                                    else:
-                                        self._ios_version = version_part
-                                    
-                                    self._header_cache = None  # Invalidate cache
-                                    return
+                    result = content.get('result', {})
+                    latest = result.get('latest', {})
+                    version = latest.get('name')
+                    
+                    if version:
+                        self._ios_version = version
+                        _LOGGER.debug(f'Extracted iOS version: {version}')
         except Exception as e:
             _LOGGER.warning(f'Failed to get iOS version: {e}')
 
     async def login(self, account: str, password: str) -> TokenInfo:
         """Optimized login with better error handling."""
         try:
-            headers = await self._generate_common_headers()
+            headers = (await self._generate_common_headers()).copy()
             headers.pop("authorization", None)  # Safe removal
             
             terminal_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, account)).upper()
@@ -462,8 +451,6 @@ class TreeowClient:
         cache_cleanup_counter = 0  # 缓存清理计数器
         
         try:
-            headers = await self._generate_common_headers()
-            
             # Start heartbeat tasks
             for device in target_devices:
                 heartbeat_signal = threading.Event()
@@ -485,6 +472,9 @@ class TreeowClient:
             
             # Signal gateway is online
             fire_event(self._hass, EVENT_GATEWAY_STATUS_CHANGED, {'status': True})
+
+            # Generate headers once before loop (token refresh will reload integration)
+            headers = await self._generate_common_headers()
 
             # Main listening loop
             while not signal.is_set():
@@ -552,18 +542,19 @@ class TreeowClient:
         """Optimized heartbeat sending with fast retry on failure."""
         heartbeat_retry_delay = 1  # Start with 1 second for fast heartbeat recovery
         
+        # Prepare fixed payload and headers once before loop
+        payload = {"value": 0}
+        headers = (await self._generate_common_headers()).copy()
+        headers.update({
+            'domainidentifier': str(device.category or ''),
+            'propidentifier': 'online_state',
+            'localindex': str(device.localIndex or ''),
+            'deviceserial': str(device.device_serial or ''),
+            'resourcecategory': str(device.resourceCategory or '')
+        })
+        
         while not event.is_set():
             try:
-                payload = {"value": 0}
-                headers = await self._generate_common_headers()
-                headers.update({
-                    'domainidentifier': str(device.category or ''),
-                    'propidentifier': 'online_state',
-                    'localindex': str(device.localIndex or ''),
-                    'deviceserial': str(device.device_serial or ''),
-                    'resourcecategory': str(device.resourceCategory or '')
-                })
-                
                 async with self._session.put(url=SYNC_DEVICES_API, json=payload, headers=headers) as response:
                     content = await response.json(content_type=None)
                     self._assert_response_successful(content)
@@ -614,7 +605,7 @@ class TreeowClient:
             value = command[identifier]
             
             payload = {"value": value}
-            headers = await self._generate_common_headers()
+            headers = (await self._generate_common_headers()).copy()
             headers.update({
                 'domainidentifier': str(device.get('category', '')),
                 'propidentifier': str(identifier),
@@ -658,7 +649,7 @@ class TreeowClient:
                 "clienttype": "2",
                 "user-agent": f"Treeow/{self._app_version} (iPhone; iOS {self._ios_version}; Scale/3.00)"
             }
-        return self._header_cache.copy()
+        return self._header_cache
 
     @staticmethod
     def _assert_response_successful(resp: Dict[str, Any]) -> None:

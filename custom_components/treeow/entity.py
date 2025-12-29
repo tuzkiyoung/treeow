@@ -12,20 +12,15 @@ from .core.event import listen_event, fire_event
 
 _LOGGER = logging.getLogger(__name__)
 
-# Cache device info to avoid repeated dictionary creation
-_device_info_cache = {}
 
 def _get_device_info(device: TreeowDevice) -> DeviceInfo:
-    """Get cached device info to avoid repeated dictionary creation."""
-    device_id = device.id
-    if device_id not in _device_info_cache:
-        _device_info_cache[device_id] = DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=device.name,
-            manufacturer='树新风',
-            model=device.category
-        )
-    return _device_info_cache[device_id]
+    """Create device info for the given device."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, device.id)},
+        name=device.name,
+        manufacturer='树新风',
+        model=device.category
+    )
 
 
 class TreeowAbstractEntity(Entity, ABC):
