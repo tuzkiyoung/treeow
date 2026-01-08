@@ -11,7 +11,8 @@ from homeassistant.const import (
     UnitOfTemperature,
     PERCENTAGE,
     UnitOfTime,
-    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER
 )
 
 from custom_components.treeow.helpers import equals_ignore_case, contains_any_ignore_case
@@ -27,7 +28,7 @@ SENSOR_KEYWORDS = {
     '温度': (None, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS),
     '湿度': (None, SensorDeviceClass.HUMIDITY, PERCENTAGE),
     '寿命': (None, SensorDeviceClass.BATTERY, PERCENTAGE),
-    '甲醛': (SensorStateClass.MEASUREMENT, SensorDeviceClass.AQI, None),
+    '甲醛': (SensorStateClass.MEASUREMENT, None, CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER),
     '水位': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
     '水量': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
     '液位': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),

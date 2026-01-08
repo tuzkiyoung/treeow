@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class TreeowSensor(TreeowAbstractEntity, SensorEntity):
     """Optimized sensor entity with improved value processing."""
 
-    __slots__ = ('_comparison_table', '_is_temp_or_humidity')
+    __slots__ = ('_comparison_table', '_is_temp_or_humidity', '_is_hcho')
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         super().__init__(device, attribute)
@@ -36,6 +36,8 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
         # Cache whether this sensor is temperature or humidity for optimization
         device_class = attribute.options.get('device_class')
         self._is_temp_or_humidity = device_class in (SensorDeviceClass.TEMPERATURE, SensorDeviceClass.HUMIDITY)
+        # Cache whether this sensor is HCHO (formaldehyde) - needs value / 1000 conversion
+        self._is_hcho = '甲醛' in attribute.display_name
 
     def _update_value(self):
         """Optimized value update with temperature/humidity value processing."""
@@ -55,5 +57,10 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
             if abs(processed_value) > 100:
                 processed_value = processed_value / 10
                 _LOGGER.debug(f'Sensor [{self._attr_unique_id}] temperature/humidity value {value} adjusted to {processed_value}')
+        
+        # Handle HCHO (formaldehyde) values - API returns integer (e.g. 35), convert to mg/m³ (0.035)
+        if self._is_hcho and isinstance(processed_value, (int, float)):
+            processed_value = processed_value / 1000
+            _LOGGER.debug(f'Sensor [{self._attr_unique_id}] HCHO value {value} converted to {processed_value} mg/m³')
             
         self._attr_native_value = processed_value
