@@ -1,12 +1,15 @@
 # Treeow Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/tuzkiyoung/treeow.svg)](https://github.com/tuzkiyoung/treeow/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/tuzkiyoung/treeow.svg)](https://github.com/tuzkiyoung/treeow/stargazers)
 [![License](https://img.shields.io/github/license/tuzkiyoung/treeow.svg)](LICENSE)
 [![Validate](https://github.com/tuzkiyoung/treeow/actions/workflows/validate.yml/badge.svg)](https://github.com/tuzkiyoung/treeow/actions/workflows/validate.yml)
 
-**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant. This custom component enables seamless integration of 树新风 (Treeow) smart appliances into your smart home ecosystem.
+[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
+[![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=treeow)
+
+**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant. This custom component enables seamless integration of Treeow smart appliances into your smart home ecosystem.
 
 **树新风 Home Assistant 集成** - 将树新风智能家居设备（空气净化器、加湿器）接入 Home Assistant，实现智能家居统一控制。
 
@@ -48,14 +51,13 @@
 
 #### Via HACS (Recommended)
 
-1. Open HACS in Home Assistant
-2. Click on "Integrations"
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add `https://github.com/tuzkiyoung/treeow` as repository URL
-6. Select "Integration" as category
-7. Click "Add"
-8. Search for "Treeow" in HACS and install
+[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
+
+1. Click the button above to open Treeow in HACS directly
+2. Click "Download"
+3. Restart Home Assistant
+
+Or manually: Open HACS → Search "Treeow" → Download → Restart
 
 #### Manual Installation
 
@@ -65,11 +67,12 @@
 
 ### Configuration
 
-1. Go to **Settings** > **Devices & Services**
-2. Click **Add Integration**
-3. Search for "Treeow"
-4. Enter your Treeow Home account credentials
-5. Configure device and entity filters as needed
+[![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=treeow)
+
+1. Click the button above, or go to **Settings** > **Devices & Services**
+2. Click **Add Integration** and search for "Treeow"
+3. Enter your Treeow Home account credentials
+4. Configure device and entity filters as needed
 
 ### Debugging
 
@@ -122,14 +125,13 @@ logger:
 
 #### 通过 HACS 安装（推荐）
 
-1. 在 Home Assistant 中打开 HACS
-2. 点击"集成"
-3. 点击右上角的三个点
-4. 选择"自定义存储库"
-5. 添加 `https://github.com/tuzkiyoung/treeow` 作为存储库 URL
-6. 选择"Integration"作为类别
-7. 点击"添加"
-8. 在 HACS 中搜索"Treeow"并安装
+[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
+
+1. 点击上方按钮直接打开 HACS 中的 Treeow 页面
+2. 点击"下载"
+3. 重启 Home Assistant
+
+或手动安装：打开 HACS → 搜索 "Treeow" → 下载 → 重启
 
 #### 手动安装
 
@@ -139,11 +141,12 @@ logger:
 
 ### 配置
 
-1. 进入 **配置** > **设备与服务**
-2. 点击 **添加集成**
-3. 搜索 "Treeow"
-4. 输入您的 Treeow Home 账户凭据
-5. 根据需要配置设备和实体过滤器
+[![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=treeow)
+
+1. 点击上方按钮，或进入 **配置** > **设备与服务**
+2. 点击 **添加集成** 并搜索 "Treeow"
+3. 输入您的 Treeow Home 账户凭据
+4. 根据需要配置设备和实体过滤器
 
 ### 调试
 
