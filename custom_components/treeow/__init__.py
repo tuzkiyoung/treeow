@@ -37,7 +37,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Initialize versions and create client
     app_version, ios_version = await initialize_versions(hass)
-    _LOGGER.debug(f'Initialized versions: app_version={app_version}, ios_version={ios_version}')
     client = TreeowClient(hass, account_cfg.access_token, app_version, ios_version)
     hass.data[DOMAIN]['client'] = client
     

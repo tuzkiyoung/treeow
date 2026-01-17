@@ -70,7 +70,7 @@ async def initialize_versions(hass: HomeAssistant) -> tuple[str, str]:
         _LOGGER.warning('Version initialization timed out after 10 seconds, using defaults')
     except Exception as e:
         _LOGGER.warning(f'Failed to initialize versions: {e}, using defaults')
-    
+    _LOGGER.debug(f'Initialized versions: app_version={app_version}, ios_version={ios_version}')
     return app_version, ios_version
 
 
