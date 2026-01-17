@@ -450,19 +450,24 @@ class TreeowClient:
             # Set up control event listener
             async def control_callback(event):
                 """Handle device control events asynchronously with immediate state polling."""
+                device_dict = event.data['device']
+                device_id = device_dict.get('id')
+                
                 try:
-                    device_dict = event.data['device']
-                    device_id = device_dict.get('id')
-                    
                     await self._send_command(device_dict, event.data['attributes'])
+                    _LOGGER.debug(f'Command sent successfully for device {device_id}')
+                        
+                except Exception as e:
+                    _LOGGER.error(f'Failed to send command for device {device_id}: {e}')
 
+                try:
                     if device_id in device_map:
                         headers = await self._generate_common_headers()
                         await self._poll_device(device_map[device_id], headers)
                         _LOGGER.debug(f'Immediately polled device {device_id} after control command')
                         
                 except Exception as e:
-                    _LOGGER.error(f'Failed to handle device control event: {e}')
+                    _LOGGER.error(f'Failed to poll device {device_id} after control: {e}')
 
             cancel_control_listen = listen_event(self._hass, EVENT_DEVICE_CONTROL, control_callback)
             
