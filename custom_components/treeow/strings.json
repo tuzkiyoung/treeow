@@ -9,7 +9,7 @@
           "account": "Account",
           "password": "Password",
           "default_load_all_entity": "Default load all entity",
-          "poll_interval": "Poll interval (seconds)"
+          "poll_interval": "Poll interval (1-60 seconds, default: 5)"
         },
         "description": "Enter your Treeow Account.",
         "title": "Configure account information"
@@ -34,7 +34,7 @@
           "account": "Account",
           "password": "Password",
           "default_load_all_entity": "Default load all entity",
-          "poll_interval": "Poll interval (seconds)"
+          "poll_interval": "Poll interval (1-60 seconds, default: 5)"
         }
       },
       "device": {

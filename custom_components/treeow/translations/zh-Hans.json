@@ -11,7 +11,7 @@
                     "account": "账号",
                     "password": "密码",
                     "default_load_all_entity": "默认加载所有实体",
-                    "poll_interval": "轮询间隔（秒）"
+                    "poll_interval": "轮询间隔（1-60秒，默认5秒）"
                 }
             }
         }
@@ -34,7 +34,7 @@
                     "account": "账号",
                     "password": "密码",
                     "default_load_all_entity": "默认加载所有实体",
-                    "poll_interval": "轮询间隔（秒）"
+                    "poll_interval": "轮询间隔（1-60秒，默认5秒）"
                 }
             },
             "device": {
