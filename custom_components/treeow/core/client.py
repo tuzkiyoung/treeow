@@ -324,7 +324,7 @@ class TreeowClient:
 
     def _get_device_store(self, device_id: str) -> Store:
         """获取设备专属的存储对象"""
-        return Store(self._hass, const.STORAGE_VERSION, f"{const.STORAGE_KEY}/{device_id}")
+        return Store(self._hass, const.STORAGE_VERSION, f"{const.STORAGE_KEY}/{device_id}.json")
 
     async def _load_device_cache(self, device_id: str) -> Dict[str, Any]:
         """从文件加载单个设备的缓存"""
