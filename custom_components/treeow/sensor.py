@@ -52,11 +52,9 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
         if self._is_temp_or_humidity and isinstance(processed_value, (int, float)):
             if abs(processed_value) > 100:
                 processed_value = processed_value / 10
-                _LOGGER.debug(f'Sensor [{self._attr_unique_id}] temperature/humidity value {value} adjusted to {processed_value}')
         
         # Handle HCHO (formaldehyde) values - API returns integer (e.g. 35), convert to mg/m³ (0.035)
         if self._is_hcho and isinstance(processed_value, (int, float)) and processed_value > 1:
             processed_value = processed_value / 1000
-            _LOGGER.debug(f'Sensor [{self._attr_unique_id}] HCHO value {value} converted to {processed_value} mg/m³')
             
         self._attr_native_value = processed_value
