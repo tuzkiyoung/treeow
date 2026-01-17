@@ -11,26 +11,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .device import TreeowDevice
 from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
-from custom_components.treeow.const import DEFAULT_POLL_INTERVAL
+from custom_components.treeow import const
 
 _LOGGER = logging.getLogger(__name__)
-
-LOGIN_API = 'https://eziotes.treeow.com.cn/api/user/account/login'
-REFRESH_TOKEN_API = 'https://eziotes.treeow.com.cn/api/user/account/refresh/token'
-VERIFY_TOKEN_API = 'https://eziotes.treeow.com.cn/api/msg/unread/count'
-DESCRIBE_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/device/info'
-SYNC_DEVICES_API = 'https://eziotes.treeow.com.cn/api/v3/device/otap/prop'
-LIST_DEVICES_API = 'https://eziotes.treeow.com.cn/api/resource/v3/device/list/page'
-LIST_HOME_API = 'https://eziotes.treeow.com.cn/api/resource/home/list'
-GET_APP_VERSION_API = 'https://itunes.apple.com/cn/lookup?id=6505056723'
-GET_IOS_VERSION_API = 'https://endoflife.date/api/v1/products/ios/releases/latest'
-
-CACHE_EXPIRATION = 3600  # 1 hour
-HEARTBEAT_INTERVAL = 10  # seconds
-RETRY_DELAY = 5  # seconds
-RETRY_MULTIPLIER = 2  # retry delay multiplier
-MAX_RETRY_DELAY = 60  # seconds
-DEFAULT_PAGE_SIZE = 50
 
 
 class TokenInfo:
@@ -113,7 +96,7 @@ class TreeowClient:
     async def get_app_version(self) -> None:
         """Get app version with optimized error handling."""
         try:
-            async with self._session.get(url=GET_APP_VERSION_API) as response:
+            async with self._session.get(url=const.GET_APP_VERSION_API) as response:
                 content = await response.json(content_type=None)
                 results = content.get('results', [])
                 if results and results[0].get('trackName') == 'Treeow Home':
@@ -124,7 +107,7 @@ class TreeowClient:
     async def get_ios_version(self) -> None:
         """Get latest iOS version from endoflife.date API."""
         try:
-            async with self._session.get(url=GET_IOS_VERSION_API) as response:
+            async with self._session.get(url=const.GET_IOS_VERSION_API) as response:
                 content = await response.json(content_type=None)
                 if content:
                     result = content.get('result', {})
@@ -153,7 +136,7 @@ class TreeowClient:
                 "terminalName": "iPhone"
             }
             
-            async with self._session.post(url=LOGIN_API, headers=headers, json=payload) as response:
+            async with self._session.post(url=const.LOGIN_API, headers=headers, json=payload) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
 
@@ -176,7 +159,7 @@ class TreeowClient:
             payload = {'refreshToken': refresh_token}
             headers = await self._generate_common_headers()
             
-            async with self._session.post(url=REFRESH_TOKEN_API, headers=headers, json=payload) as response:
+            async with self._session.post(url=const.REFRESH_TOKEN_API, headers=headers, json=payload) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
 
@@ -197,7 +180,7 @@ class TreeowClient:
         """Optimized token verification."""
         try:
             headers = await self._generate_common_headers()
-            async with self._session.post(url=VERIFY_TOKEN_API, headers=headers, json={}) as response:
+            async with self._session.post(url=const.VERIFY_TOKEN_API, headers=headers, json={}) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
         except TreeowClientException as e:
@@ -244,12 +227,12 @@ class TreeowClient:
     async def _get_devices_for_group(self, group_id: str, headers: Dict[str, str]) -> List[TreeowDevice]:
         """Helper method to get devices for a specific group."""
         payload = {
-            "pageSize": str(DEFAULT_PAGE_SIZE),
+            "pageSize": str(const.DEFAULT_PAGE_SIZE),
             "groupId": group_id,
             "pageNo": "1"
         }
         
-        async with self._session.post(url=LIST_DEVICES_API, headers=headers, json=payload) as response:
+        async with self._session.post(url=const.LIST_DEVICES_API, headers=headers, json=payload) as response:
             content = await response.json(content_type=None)
             self._assert_response_successful(content)
             
@@ -269,12 +252,12 @@ class TreeowClient:
         
         # Return cached result if still valid
         if (self._group_cache is not None and 
-            current_time - self._group_cache_time < CACHE_EXPIRATION):
+            current_time - self._group_cache_time < const.CACHE_EXPIRATION):
             return self._group_cache
 
         try:
             headers = await self._generate_common_headers()
-            async with self._session.post(url=LIST_HOME_API, headers=headers) as response:
+            async with self._session.post(url=const.LIST_HOME_API, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
@@ -309,13 +292,13 @@ class TreeowClient:
             pv = f"PV(productId={product_id}, version={device.version})"
             
             payload = {
-                "pageSize": str(DEFAULT_PAGE_SIZE),
+                "pageSize": str(const.DEFAULT_PAGE_SIZE),
                 "groupId": device.group_id,
                 "pageNo": "1"
             }
             
             headers = await self._generate_common_headers()
-            async with self._session.post(url=LIST_DEVICES_API, json=payload, headers=headers) as response:
+            async with self._session.post(url=const.LIST_DEVICES_API, json=payload, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
@@ -348,7 +331,7 @@ class TreeowClient:
         # 检查内存缓存
         if device_id in self._digital_model_cache:
             cache_time = self._digital_model_cache_time.get(device_id, 0)
-            if current_time - cache_time < CACHE_EXPIRATION:
+            if current_time - cache_time < const.CACHE_EXPIRATION:
                 # 缓存有效，直接返回
                 return self._digital_model_cache[device_id]
             else:
@@ -371,7 +354,7 @@ class TreeowClient:
         expired_devices = []
         
         for device_id, cache_time in self._digital_model_cache_time.items():
-            if current_time - cache_time >= CACHE_EXPIRATION:
+            if current_time - cache_time >= const.CACHE_EXPIRATION:
                 expired_devices.append(device_id)
         
         for device_id in expired_devices:
@@ -389,7 +372,7 @@ class TreeowClient:
         valid_entries = 0
         
         for cache_time in self._digital_model_cache_time.values():
-            if current_time - cache_time >= CACHE_EXPIRATION:
+            if current_time - cache_time >= const.CACHE_EXPIRATION:
                 expired_entries += 1
             else:
                 valid_entries += 1
@@ -407,7 +390,7 @@ class TreeowClient:
             payload = {"id": device.id}
             headers = await self._generate_common_headers()
             
-            async with self._session.post(url=DESCRIBE_DEVICES_API, json=payload, headers=headers) as response:
+            async with self._session.post(url=const.DESCRIBE_DEVICES_API, json=payload, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
@@ -440,14 +423,14 @@ class TreeowClient:
             _LOGGER.error(f'Failed to get snapshot data for device {device.id}: {e}')
             raise TreeowClientException(f'Failed to get snapshot data for device {device.id}: {e}')
 
-    async def listen_devices(self, target_devices: List[TreeowDevice], signal: threading.Event, poll_interval: int = DEFAULT_POLL_INTERVAL) -> None:
+    async def listen_devices(self, target_devices: List[TreeowDevice], signal: threading.Event, poll_interval: int = const.DEFAULT_POLL_INTERVAL) -> None:
         """Optimized device listening with better resource management and exponential backoff retry."""
         process_id = str(uuid.uuid4())
         self._hass.data['current_listen_devices_process_id'] = process_id
         
         cancel_control_listen = None
         heartbeat_tasks = []
-        retry_delay = RETRY_DELAY  # Initial retry delay
+        retry_delay = const.RETRY_DELAY  # Initial retry delay
         cache_cleanup_counter = 0  # 缓存清理计数器
         cache_cleanup_threshold = max(3600 // poll_interval, 1)  # 约1小时清理一次缓存
         
@@ -508,14 +491,14 @@ class TreeowClient:
                         cache_cleanup_counter = 0
                     
                     # Reset retry delay on successful operation
-                    retry_delay = RETRY_DELAY
+                    retry_delay = const.RETRY_DELAY
 
                 except Exception as e:
                     _LOGGER.error(f'Device listening error: {e}, retrying in {retry_delay} seconds')
                     await asyncio.sleep(retry_delay)
                     
                     # Exponential backoff: double the delay for next retry
-                    retry_delay = min(retry_delay * RETRY_MULTIPLIER, MAX_RETRY_DELAY)
+                    retry_delay = min(retry_delay * const.RETRY_MULTIPLIER, const.MAX_RETRY_DELAY)
                     _LOGGER.debug(f'Next retry delay set to {retry_delay} seconds')
 
         finally:
@@ -541,7 +524,7 @@ class TreeowClient:
         """Helper method to poll a single device."""
         try:
             payload = {"id": device.id}
-            async with self._session.post(url=DESCRIBE_DEVICES_API, json=payload, headers=headers) as response:
+            async with self._session.post(url=const.DESCRIBE_DEVICES_API, json=payload, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
@@ -568,20 +551,20 @@ class TreeowClient:
         
         while not event.is_set():
             try:
-                async with self._session.put(url=SYNC_DEVICES_API, json=payload, headers=headers) as response:
+                async with self._session.put(url=const.SYNC_DEVICES_API, json=payload, headers=headers) as response:
                     content = await response.json(content_type=None)
                     self._assert_response_successful(content)
                     
                 # Reset retry delay on successful heartbeat, then wait normal interval
                 heartbeat_retry_delay = 1
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                await asyncio.sleep(const.HEARTBEAT_INTERVAL)
                     
             except Exception as e:
                 _LOGGER.error(f'Device {device.id} heartbeat failed: {e}, retrying in {heartbeat_retry_delay} seconds')
                 await asyncio.sleep(heartbeat_retry_delay)
                 
                 # Fast retry with small increments, but don't exceed heartbeat interval
-                heartbeat_retry_delay = min(heartbeat_retry_delay * 2, HEARTBEAT_INTERVAL)
+                heartbeat_retry_delay = min(heartbeat_retry_delay * 2, const.HEARTBEAT_INTERVAL)
                 _LOGGER.debug(f'Device {device.id} heartbeat next retry delay set to {heartbeat_retry_delay} seconds')
 
     async def _parse_message(self, device: TreeowDevice, msg: Dict[str, Any]) -> None:
@@ -628,12 +611,12 @@ class TreeowClient:
             })
             
             # Send command
-            async with self._session.put(url=SYNC_DEVICES_API, json=payload, headers=headers) as response:
+            async with self._session.put(url=const.SYNC_DEVICES_API, json=payload, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
             
             # Verify command
-            async with self._session.get(url=SYNC_DEVICES_API, headers=headers) as response:
+            async with self._session.get(url=const.SYNC_DEVICES_API, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
