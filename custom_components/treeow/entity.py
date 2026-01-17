@@ -17,10 +17,10 @@ def _get_device_info(device: TreeowDevice) -> DeviceInfo:
     """Create device info for the given device."""
     return DeviceInfo(
         identifiers={(DOMAIN, device.id)},
-        name=device.name,
-        manufacturer='树新风',
-        model=device.category
-    )
+            name=device.name,
+            manufacturer='树新风',
+            model=device.category
+        )
 
 
 class TreeowAbstractEntity(Entity, ABC):

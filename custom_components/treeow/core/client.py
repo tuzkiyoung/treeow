@@ -451,6 +451,9 @@ class TreeowClient:
         cache_cleanup_counter = 0  # 缓存清理计数器
         cache_cleanup_threshold = max(3600 // poll_interval, 1)  # 约1小时清理一次缓存
         
+        # Create device ID to TreeowDevice mapping for quick lookup during control
+        device_map = {device.id: device for device in target_devices}
+        
         try:
             # Start heartbeat tasks
             for device in target_devices:
@@ -463,9 +466,18 @@ class TreeowClient:
 
             # Set up control event listener
             async def control_callback(event):
-                """Handle device control events asynchronously."""
+                """Handle device control events asynchronously with immediate state polling."""
                 try:
-                    await self._send_command(event.data['device'], event.data['attributes'])
+                    device_dict = event.data['device']
+                    device_id = device_dict.get('id')
+                    
+                    await self._send_command(device_dict, event.data['attributes'])
+
+                    if device_id in device_map:
+                        headers = await self._generate_common_headers()
+                        await self._poll_device(device_map[device_id], headers)
+                        _LOGGER.debug(f'Immediately polled device {device_id} after control command')
+                        
                 except Exception as e:
                     _LOGGER.error(f'Failed to handle device control event: {e}')
 
