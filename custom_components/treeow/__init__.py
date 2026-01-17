@@ -8,18 +8,20 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .const import DOMAIN, SUPPORTED_PLATFORMS, FILTER_TYPE_EXCLUDE
+from .const import (
+    DOMAIN,
+    SUPPORTED_PLATFORMS,
+    FILTER_TYPE_EXCLUDE,
+    TOKEN_CHECK_INTERVAL,
+    TOKEN_REFRESH_THRESHOLD,
+    TOKEN_RETRY_DELAY,
+    TOKEN_RETRY_MULTIPLIER,
+    TOKEN_MAX_RETRY_DELAY
+)
 from .core.client import TreeowClient, TreeowClientException
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
 
 _LOGGER = logging.getLogger(__name__)
-
-# Constants for optimization
-TOKEN_CHECK_INTERVAL = 3600  # 1 hour
-TOKEN_REFRESH_THRESHOLD = 86400  # 1 day
-TOKEN_RETRY_DELAY = 30  # seconds (initial retry delay for token operations)
-TOKEN_RETRY_MULTIPLIER = 2  # retry delay multiplier
-TOKEN_MAX_RETRY_DELAY = 300  # seconds (5 minutes max retry delay)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -31,12 +31,9 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         super().__init__(device, attribute)
-        # Cache comparison table to avoid repeated dict access
         self._comparison_table = attribute.ext.get('value_comparison_table', {})
-        # Cache whether this sensor is temperature or humidity for optimization
         device_class = attribute.options.get('device_class')
         self._is_temp_or_humidity = device_class in (SensorDeviceClass.TEMPERATURE, SensorDeviceClass.HUMIDITY)
-        # Cache whether this sensor is HCHO (formaldehyde) - needs value / 1000 conversion
         self._is_hcho = '甲醛' in attribute.display_name
 
     def _update_value(self):
@@ -46,7 +43,6 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
             self._attr_native_value = None
             return
             
-        # Use cached comparison table for better performance
         if self._comparison_table and value in self._comparison_table:
             processed_value = self._comparison_table[value]
         else:

@@ -42,3 +42,10 @@ STORAGE_KEY = "treeow"
 EVENT_DEVICE_CONTROL = 'device_control'
 EVENT_DEVICE_DATA_CHANGED = 'device_data_changed'
 EVENT_GATEWAY_STATUS_CHANGED = 'gateway_status_changed'
+
+# Token Management Constants
+TOKEN_CHECK_INTERVAL = 3600  # 1 hour
+TOKEN_REFRESH_THRESHOLD = 86400  # 1 day
+TOKEN_RETRY_DELAY = 30  # seconds (initial retry delay for token operations)
+TOKEN_RETRY_MULTIPLIER = 2  # retry delay multiplier
+TOKEN_MAX_RETRY_DELAY = 300  # seconds (5 minutes max retry delay)

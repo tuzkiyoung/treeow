@@ -30,7 +30,6 @@ class AccountConfig:
     def save(self):
         self._hass.config_entries.async_update_entry(
             self._config,
-            # title='Treeow: {}'.format(mobile) if mobile else self._config.title,
             data={
                 **self._config.data,
                 'account': {

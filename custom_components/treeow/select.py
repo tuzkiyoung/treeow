@@ -35,13 +35,12 @@ class TreeowSelect(TreeowAbstractEntity, SelectEntity):
         # Cache attribute key to avoid repeated property access
         self._attr_key = attribute.key
         
-        # Validate and cache comparison table
         if 'value_comparison_table' not in attribute.ext:
             raise ValueError(f'Device [{device.id}] attribute [{attribute.key}] missing value_comparison_table')
             
         self._value_comparison_table = attribute.ext['value_comparison_table']
         
-        # Create reverse lookup table for better performance
+        # Create reverse lookup table
         self._reverse_comparison_table = {}
         for key, value in self._value_comparison_table.items():
             self._reverse_comparison_table[value] = key
@@ -53,7 +52,6 @@ class TreeowSelect(TreeowAbstractEntity, SelectEntity):
             self._attr_current_option = None
             return
             
-        # Use cached lookup for better performance
         if value in self._value_comparison_table:
             self._attr_current_option = self._value_comparison_table[value]
         else:
@@ -62,7 +60,6 @@ class TreeowSelect(TreeowAbstractEntity, SelectEntity):
 
     def select_option(self, option: str) -> None:
         """Select an option with optimized reverse lookup."""
-        # Use cached reverse lookup for better performance
         if option in self._reverse_comparison_table:
             command_value = self._reverse_comparison_table[option]
         else:

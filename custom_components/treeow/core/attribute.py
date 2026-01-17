@@ -19,7 +19,6 @@ from custom_components.treeow.helpers import equals_ignore_case, contains_any_ig
 
 _LOGGER = logging.getLogger(__name__)
 
-# Constants for optimization
 EXCLUDED_ATTRIBUTES = frozenset(('wifi_info', 'timestamp'))
 SENSOR_KEYWORDS = {
     '累计': (SensorStateClass.TOTAL, None, None),

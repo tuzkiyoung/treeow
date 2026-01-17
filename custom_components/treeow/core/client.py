@@ -53,7 +53,7 @@ class TreeowClient:
     """Optimized TreeowClient with improved performance and error handling."""
 
     __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', 
-                 '_header_cache', '_group_cache', '_group_cache_time', '_versions_initialized')
+                 '_header_cache', '_init_task')
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
@@ -62,9 +62,7 @@ class TreeowClient:
         self._hass = hass
         self._session = async_get_clientsession(hass)
         self._header_cache = None
-        self._group_cache = None
-        self._group_cache_time = 0
-        self._versions_initialized = False
+        self._init_task = None
 
     @property
     def hass(self) -> HomeAssistant:
@@ -72,27 +70,32 @@ class TreeowClient:
 
     async def initialize_versions(self) -> None:
         """Initialize versions once during service startup."""
-        if self._versions_initialized:
+        # If task already exists, wait for it to complete
+        if self._init_task is not None:
+            await self._init_task
             return
-            
-        try:
-            # Get versions concurrently for better performance
-            await asyncio.gather(
-                self.get_app_version(),
-                self.get_ios_version()
-            )
-            
-            if not self._app_version.replace('.', '').isdigit():
-                _LOGGER.warning(f'Invalid app version format: {self._app_version}, using default')
-                self._app_version = '1.1.8'
-            
-            if not self._ios_version.replace('.', '').isdigit():
-                _LOGGER.warning(f'Invalid iOS version format: {self._ios_version}, using default')
-                self._ios_version = '18.5'
-            
-            self._versions_initialized = True
-        except Exception as e:
-            _LOGGER.warning(f'Failed to initialize versions: {e}')
+        
+        # Create task for initialization
+        async def _do_init():
+            try:
+                # Get versions concurrently for better performance
+                await asyncio.gather(
+                    self.get_app_version(),
+                    self.get_ios_version()
+                )
+                
+                if not self._app_version.replace('.', '').isdigit():
+                    _LOGGER.warning(f'Invalid app version format: {self._app_version}, using default')
+                    self._app_version = '1.1.8'
+                
+                if not self._ios_version.replace('.', '').isdigit():
+                    _LOGGER.warning(f'Invalid iOS version format: {self._ios_version}, using default')
+                    self._ios_version = '18.5'
+            except Exception as e:
+                _LOGGER.warning(f'Failed to initialize versions: {e}')
+        
+        self._init_task = asyncio.create_task(_do_init())
+        await self._init_task
 
     async def get_app_version(self) -> None:
         """Get app version with optimized error handling."""
@@ -248,29 +251,17 @@ class TreeowClient:
             return devices
 
     async def get_groups(self) -> List[str]:
-        """Optimized group retrieval with caching."""
-        current_time = time.time()
-        
-        # Return cached result if still valid
-        if (self._group_cache is not None and 
-            current_time - self._group_cache_time < const.CACHE_EXPIRATION):
-            return self._group_cache
-
+        """Get device groups from API."""
         try:
             headers = await self._generate_common_headers()
             async with self._session.post(url=const.LIST_HOME_API, headers=headers) as response:
                 content = await response.json(content_type=None)
                 self._assert_response_successful(content)
                 
-                # Optimized group ID extraction
                 group_ids = []
                 for home in content.get('data', []):
                     for group in home.get('homeGroups', []):
                         group_ids.append(group['id'])
-                
-                # Cache the result
-                self._group_cache = group_ids
-                self._group_cache_time = current_time
                 
                 return group_ids
                 
@@ -344,7 +335,7 @@ class TreeowClient:
         
         # 检查缓存是否存在且版本匹配
         if cache and cache.get('version') == device.version:
-            _LOGGER.info(f'Device {device.id} get digital model from cache (version {device.version})')
+            _LOGGER.debug(f'Device {device.id} get digital model from cache (version {device.version})')
             return cache['attributes']
         
         # 从 API 获取
@@ -553,12 +544,10 @@ class TreeowClient:
                 return
                 
             data = json.loads(props[0]['value']).get(msg['category'], {})
-            attributes = await self.get_digital_model_from_cache(device)
-            
             values = {}
-            for attribute in attributes:
-                identifier = attribute.get('identifier')
-                if identifier and identifier in data:
+            for attribute in device.attributes:
+                identifier = attribute.key
+                if identifier in data:
                     values[identifier] = data[identifier]
 
             fire_event(self._hass, EVENT_DEVICE_DATA_CHANGED, {
@@ -611,7 +600,7 @@ class TreeowClient:
 
     async def _generate_common_headers(self) -> Dict[str, str]:
         """Optimized header generation with caching and version auto-initialization."""
-        if not self._versions_initialized:
+        if self._init_task is None:
             await self.initialize_versions()
         if self._header_cache is None:
             self._header_cache = {
