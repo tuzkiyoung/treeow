@@ -31,14 +31,10 @@ class TreeowAbstractEntity(Entity, ABC):
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         # Cache device ID to avoid repeated property access
         self._device_id = device.id
-        
-        # Use f-string for better performance
-        self._attr_unique_id = f'{DOMAIN}.{self._device_id}_{attribute.key}'.lower()
-        self.entity_id = self._attr_unique_id
-        self._attr_should_poll = False
-
-        self._attr_device_info = _get_device_info(device)
+        self._attr_unique_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
         self._attr_name = attribute.display_name
+        self._attr_should_poll = False
+        self._attr_device_info = _get_device_info(device)
         
         # Batch attribute assignment to reduce overhead
         for key, value in attribute.options.items():
