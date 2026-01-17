@@ -8,6 +8,7 @@ import uuid
 from typing import List, Dict, Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from .device import TreeowDevice
 from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
@@ -49,7 +50,7 @@ class TreeowClient:
 
     __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', 
                  '_header_cache', '_group_cache', '_group_cache_time', '_versions_initialized',
-                 '_digital_model_cache', '_digital_model_cache_time')
+                 '_digital_model_store', '_digital_model_cache', '_cache_loaded')
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
@@ -61,9 +62,9 @@ class TreeowClient:
         self._group_cache = None
         self._group_cache_time = 0
         self._versions_initialized = False
-        # 内存缓存，完全替代文件缓存
-        self._digital_model_cache = {}
-        self._digital_model_cache_time = {}
+        self._digital_model_store = Store(hass, const.STORAGE_VERSION, const.STORAGE_KEY)
+        self._digital_model_cache = None  # 延迟加载
+        self._cache_loaded = False
 
     @property
     def hass(self) -> HomeAssistant:
@@ -323,64 +324,94 @@ class TreeowClient:
             _LOGGER.error(f'Failed to get digital model for device {device.id}: {e}')
             raise TreeowClientException(f'Failed to get digital model for device {device.id}: {e}')
 
-    async def get_digital_model_from_cache(self, device: TreeowDevice) -> List[Dict[str, Any]]:
-        """完全基于内存缓存的数字模型获取，缓存时间1小时。"""
-        device_id = device.id
-        current_time = int(time.time())
-        
-        # 检查内存缓存
-        if device_id in self._digital_model_cache:
-            cache_time = self._digital_model_cache_time.get(device_id, 0)
-            if current_time - cache_time < const.CACHE_EXPIRATION:
-                # 缓存有效，直接返回
-                return self._digital_model_cache[device_id]
-            else:
-                # 缓存过期，清理
-                del self._digital_model_cache[device_id]
-                del self._digital_model_cache_time[device_id]
-        
-        # 缓存未命中或过期，从API获取数据
-        attributes = await self.get_digital_model(device)
-        
-        # 更新内存缓存
-        self._digital_model_cache[device_id] = attributes
-        self._digital_model_cache_time[device_id] = current_time
-        
-        return attributes
+    async def _load_cache(self) -> None:
+        """从文件加载缓存到内存"""
+        if not self._cache_loaded:
+            try:
+                data = await self._digital_model_store.async_load()
+                self._digital_model_cache = data if data else {}
+                self._cache_loaded = True
+                _LOGGER.debug(f'Loaded digital model cache with {len(self._digital_model_cache)} entries')
+            except Exception as e:
+                _LOGGER.warning(f'Failed to load digital model cache: {e}, starting with empty cache')
+                self._digital_model_cache = {}
+                self._cache_loaded = True
 
-    def _cleanup_expired_cache(self) -> None:
-        """清理过期的内存缓存，防止内存泄漏。"""
-        current_time = int(time.time())
-        expired_devices = []
+    async def _save_cache(self) -> None:
+        """保存缓存到文件"""
+        try:
+            await self._digital_model_store.async_save(self._digital_model_cache)
+            _LOGGER.debug(f'Saved digital model cache with {len(self._digital_model_cache)} entries')
+        except Exception as e:
+            _LOGGER.error(f'Failed to save digital model cache: {e}')
+
+    async def get_digital_model_from_cache(self, device: TreeowDevice) -> List[Dict[str, Any]]:
+        """永久缓存 + 版本控制，只在设备版本变化或缓存不存在时更新。"""
+        if not self._cache_loaded:
+            await self._load_cache()
         
-        for device_id, cache_time in self._digital_model_cache_time.items():
-            if current_time - cache_time >= const.CACHE_EXPIRATION:
-                expired_devices.append(device_id)
+        device_id = device.id
+        cache_key = f"{device_id}_{device.version}"
         
-        for device_id in expired_devices:
-            del self._digital_model_cache[device_id]
-            del self._digital_model_cache_time[device_id]
+        # 检查缓存是否存在且版本匹配
+        if cache_key in self._digital_model_cache:
+            _LOGGER.debug(f'Cache hit for device {device_id} (version {device.version})')
+            return self._digital_model_cache[cache_key]['data']
         
-        if expired_devices:
-            _LOGGER.debug(f'Cleaned up {len(expired_devices)} expired cache entries')
+        _LOGGER.info(f'Fetching digital model for device {device_id} (version {device.version})')
+        
+        try:
+            attributes = await self.get_digital_model(device)
+            
+            # 保存到缓存（永久）
+            self._digital_model_cache[cache_key] = {
+                'data': attributes,
+                'version': device.version,
+                'device_id': device_id
+            }
+            
+            # 清理同一设备的旧版本缓存
+            old_keys = [k for k in self._digital_model_cache.keys() 
+                       if k.startswith(f"{device_id}_") and k != cache_key]
+            for old_key in old_keys:
+                del self._digital_model_cache[old_key]
+                _LOGGER.debug(f'Removed old cache for {old_key}')
+            
+            # 异步保存到文件
+            asyncio.create_task(self._save_cache())
+            
+            return attributes
+            
+        except Exception as e:
+            # 如果获取失败，尝试使用同设备的旧版本缓存（容错）
+            _LOGGER.error(f'Failed to fetch digital model for device {device_id}: {e}')
+            prefix = f"{device_id}_"
+            for key in self._digital_model_cache:
+                if key.startswith(prefix):
+                    _LOGGER.warning(f'Using old cache version for device {device_id} due to API error')
+                    return self._digital_model_cache[key]['data']
+            raise
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息，用于调试和监控。"""
-        current_time = int(time.time())
-        total_entries = len(self._digital_model_cache)
-        expired_entries = 0
-        valid_entries = 0
+        if not self._cache_loaded or self._digital_model_cache is None:
+            return {
+                'total_entries': 0,
+                'devices': [],
+                'memory_usage_mb': 0
+            }
         
-        for cache_time in self._digital_model_cache_time.values():
-            if current_time - cache_time >= const.CACHE_EXPIRATION:
-                expired_entries += 1
-            else:
-                valid_entries += 1
+        # 统计每个设备的缓存版本
+        device_versions = {}
+        for cache_key, cache_entry in self._digital_model_cache.items():
+            device_id = cache_entry.get('device_id', 'unknown')
+            version = cache_entry.get('version', 'unknown')
+            device_versions[device_id] = version
         
         return {
-            'total_entries': total_entries,
-            'valid_entries': valid_entries,
-            'expired_entries': expired_entries,
+            'total_entries': len(self._digital_model_cache),
+            'devices': list(device_versions.keys()),
+            'device_versions': device_versions,
             'memory_usage_mb': sum(len(str(v)) for v in self._digital_model_cache.values()) / (1024 * 1024)
         }
 
@@ -431,8 +462,6 @@ class TreeowClient:
         cancel_control_listen = None
         heartbeat_tasks = []
         retry_delay = const.RETRY_DELAY  # Initial retry delay
-        cache_cleanup_counter = 0  # 缓存清理计数器
-        cache_cleanup_threshold = max(3600 // poll_interval, 1)  # 约1小时清理一次缓存
         
         # Create device ID to TreeowDevice mapping for quick lookup during control
         device_map = {device.id: device for device in target_devices}
@@ -488,12 +517,6 @@ class TreeowClient:
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
                     await asyncio.sleep(poll_interval)
-                    
-                    # 定期清理过期缓存（约1小时清理一次）
-                    cache_cleanup_counter += 1
-                    if cache_cleanup_counter >= cache_cleanup_threshold:
-                        self._cleanup_expired_cache()
-                        cache_cleanup_counter = 0
                     
                     # Reset retry delay on successful operation
                     retry_delay = const.RETRY_DELAY

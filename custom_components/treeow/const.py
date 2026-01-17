@@ -25,7 +25,6 @@ GET_APP_VERSION_API = 'https://itunes.apple.com/cn/lookup?id=6505056723'
 GET_IOS_VERSION_API = 'https://endoflife.date/api/v1/products/ios/releases/latest'
 
 # Timing Constants
-CACHE_EXPIRATION = 3600  # 1 hour
 HEARTBEAT_INTERVAL = 10  # seconds
 DEFAULT_POLL_INTERVAL = 5  # seconds
 RETRY_DELAY = 5  # seconds
@@ -34,3 +33,7 @@ MAX_RETRY_DELAY = 60  # seconds
 
 # Other Constants
 DEFAULT_PAGE_SIZE = 50
+
+# Storage Constants
+STORAGE_VERSION = 1
+STORAGE_KEY = "treeow"
