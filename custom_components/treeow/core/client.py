@@ -10,9 +10,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from .device import TreeowDevice
-from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
 from custom_components.treeow import const
+from custom_components.treeow.const import (
+    EVENT_DEVICE_CONTROL,
+    EVENT_DEVICE_DATA_CHANGED,
+    EVENT_GATEWAY_STATUS_CHANGED
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -325,7 +329,7 @@ class TreeowClient:
         store = Store(
             self._hass, 
             const.STORAGE_VERSION, 
-            f'{const.STORAGE_KEY}/{device.category}_{device.id}.json'
+            f'{const.STORAGE_KEY}/{device.category}_{device.id}.json'.lower()
         )
         
         cache = None
@@ -352,8 +356,7 @@ class TreeowClient:
             'device': {
                 'id': device.id,
                 'name': device.name,
-                'category': device.category,
-                'version': device.version
+                'category': device.category
             },
             'version': device.version,
             'attributes': attributes

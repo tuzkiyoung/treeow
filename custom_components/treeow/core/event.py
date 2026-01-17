@@ -6,13 +6,13 @@ from homeassistant.core import HomeAssistant, CALLBACK_TYPE, Event
 from homeassistant.util.async_ import run_callback_threadsafe
 
 from custom_components.treeow import DOMAIN
+from custom_components.treeow.const import (
+    EVENT_DEVICE_CONTROL,
+    EVENT_DEVICE_DATA_CHANGED,
+    EVENT_GATEWAY_STATUS_CHANGED
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-# Event constants for better performance
-EVENT_DEVICE_CONTROL = 'device_control'
-EVENT_DEVICE_DATA_CHANGED = 'device_data_changed'
-EVENT_GATEWAY_STATUS_CHANGED = 'gateway_status_changed'
 
 # Cache for wrapped event names
 _EVENT_NAME_CACHE = {}

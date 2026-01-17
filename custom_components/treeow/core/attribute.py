@@ -87,10 +87,6 @@ class TreeowAttributeParser(ABC):
 class V1SpecAttributeParser(TreeowAttributeParser):
     """Optimized parser with caching and improved performance."""
 
-    def __init__(self):
-        # Cache for parsed display names
-        self._display_name_cache = {}
-
     @lru_cache(maxsize=128)
     def _get_display_name(self, title: str) -> str:
         """Cached display name extraction."""
@@ -113,7 +109,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         access = attribute.get('access')
         schema = attribute.get('schema', {})
         
-        # Parse based on access type with optimized branching
         if access == 'r':
             return self._parse_as_sensor(attribute)
         elif access == 'rw':
@@ -162,7 +157,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         if equals_ignore_case(schema.get('type'), 'integer'):
             state_class, device_class, unit = self._guess_state_class_device_class_and_unit(attribute)
             
-            # Batch option assignment
             if device_class:
                 options['device_class'] = device_class
             if state_class:

@@ -11,9 +11,7 @@ class TreeowDevice:
     """Optimized TreeowDevice with manual caching for better __slots__ compatibility."""
     
     __slots__ = ('_client', '_raw_data', '_attributes', '_attribute_snapshot_data', 
-                 '_device_dict_cache', '_cached_id', '_cached_name', '_cached_device_serial',
-                 '_cached_category', '_cached_version', '_cached_group_id', 
-                 '_cached_resource_category', '_cached_local_index')
+                 '_device_dict_cache', '_cached_id', '_cached_name', '_cached_category')
 
     def __init__(self, client, raw: dict):
         self._client = client
@@ -25,12 +23,7 @@ class TreeowDevice:
         # Initialize cache attributes
         self._cached_id = None
         self._cached_name = None
-        self._cached_device_serial = None
         self._cached_category = None
-        self._cached_version = None
-        self._cached_group_id = None
-        self._cached_resource_category = None
-        self._cached_local_index = None
 
     @property
     def id(self):
@@ -53,10 +46,8 @@ class TreeowDevice:
 
     @property
     def device_serial(self):
-        """Cached device serial number."""
-        if self._cached_device_serial is None:
-            self._cached_device_serial = self._raw_data.get('deviceSerial')
-        return self._cached_device_serial
+        """Device serial number."""
+        return self._raw_data.get('deviceSerial')
 
     @property
     def category(self):
@@ -67,35 +58,29 @@ class TreeowDevice:
 
     @property
     def version(self):
-        """Cached device version."""
-        if self._cached_version is None:
-            self._cached_version = self._raw_data.get('version')
-        return self._cached_version
+        """Device version."""
+        return self._raw_data.get('version')
 
     @property
     def group_id(self):
-        """Cached group ID."""
-        if self._cached_group_id is None:
-            self._cached_group_id = self._raw_data.get('groupId')
-        return self._cached_group_id
+        """Group ID."""
+        return self._raw_data.get('groupId')
 
     @property
     def resourceCategory(self):
-        """Cached resource category with safe property access."""
-        if self._cached_resource_category is None:
-            props = self._raw_data.get('props')
-            if props and len(props) > 0:
-                self._cached_resource_category = props[0].get('resourceCategory')
-        return self._cached_resource_category
+        """Resource category with safe property access."""
+        props = self._raw_data.get('props')
+        if props and len(props) > 0:
+            return props[0].get('resourceCategory')
+        return None
     
     @property
     def localIndex(self):
-        """Cached local index with safe property access."""
-        if self._cached_local_index is None:
-            props = self._raw_data.get('props')
-            if props and len(props) > 0:
-                self._cached_local_index = props[0].get('localIndex')
-        return self._cached_local_index
+        """Local index with safe property access."""
+        props = self._raw_data.get('props')
+        if props and len(props) > 0:
+            return props[0].get('localIndex')
+        return None
 
     @property
     def attributes(self) -> List[TreeowAttribute]:
@@ -116,11 +101,8 @@ class TreeowDevice:
             # Initialize parser once
             parser = V1SpecAttributeParser()
             attributes = await self._client.get_digital_model_from_cache(self)
-            
-            # Pre-allocate list with expected size
             parsed_attributes = []
             
-            # Process attributes with optimized error handling
             for item in attributes:
                 try:
                     attr = parser.parse_attribute(item, snapshot_data)
@@ -130,7 +112,6 @@ class TreeowDevice:
                     _LOGGER.warning("Device %s attribute %s parsing failed: %s", 
                                    self.id, item.get('identifier', 'unknown'), str(e))
 
-            # Add parsed attributes in batch
             self._attributes.extend(parsed_attributes)
 
             # Process global attributes

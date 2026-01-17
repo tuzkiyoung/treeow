@@ -5,22 +5,12 @@ from homeassistant.core import Event
 from homeassistant.helpers.entity import DeviceInfo, Entity
 
 from . import DOMAIN
+from .const import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .core.attribute import TreeowAttribute
-from .core.event import EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED, EVENT_DEVICE_CONTROL
 from .core.device import TreeowDevice
 from .core.event import listen_event, fire_event
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _get_device_info(device: TreeowDevice) -> DeviceInfo:
-    """Create device info for the given device."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, device.id)},
-            name=device.name,
-            manufacturer='树新风',
-            model=device.category
-        )
 
 
 class TreeowAbstractEntity(Entity, ABC):
@@ -33,20 +23,21 @@ class TreeowAbstractEntity(Entity, ABC):
         self._device_id = device.id
         self._attr_unique_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
         self._attr_name = attribute.display_name
-        object_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
-        self.entity_id = f'{attribute.platform.value}.{object_id}'
+        self.entity_id = self._attr_unique_id
         self._attr_should_poll = False
-        self._attr_device_info = _get_device_info(device)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.name,
+            manufacturer='树新风',
+            model=device.category
+        )
         
-        # Batch attribute assignment to reduce overhead
         for key, value in attribute.options.items():
             setattr(self, f'_attr_{key}', value)
 
         self._device = device
         self._attribute = attribute
-        # Pre-allocate dictionary with expected size
         self._attributes_data = {}
-        # Use list for better performance than repeated append
         self._listen_cancel = []
 
     def _send_command(self, attributes):
@@ -62,20 +53,15 @@ class TreeowAbstractEntity(Entity, ABC):
 
     async def async_added_to_hass(self) -> None:
         """Optimized entity setup with efficient event handling."""
-        # Pre-cache device ID for faster comparison
-        device_id = self._device_id
-        
-        # Status callback with optimized event handling
         def status_callback(event):
             self._attr_available = event.data['status']
             self.schedule_update_ha_state()
         
         self._listen_cancel.append(listen_event(self.hass, EVENT_GATEWAY_STATUS_CHANGED, status_callback))
 
-        # Data callback with optimized device ID comparison
         def data_callback(event):
             event_data = event.data
-            if event_data['deviceId'] != device_id:
+            if event_data['deviceId'] != self._device_id:
                 return
             
             self._attributes_data = event_data['attributes']
@@ -84,18 +70,15 @@ class TreeowAbstractEntity(Entity, ABC):
 
         self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_DATA_CHANGED, data_callback))
 
-        # Initialize with snapshot data using optimized event creation
+        # Initialize with snapshot data
         data_callback(Event('', data={
-            'deviceId': device_id,
+            'deviceId': self._device_id,
             'attributes': self._device.attribute_snapshot_data
         }))
 
     async def async_will_remove_from_hass(self) -> None:
         """Optimized cleanup with batch operation."""
-        # Use list comprehension for better performance
         for cancel in self._listen_cancel:
             cancel()
         self._listen_cancel.clear()
-        
-        # Clear references to help GC
         self._attributes_data.clear()

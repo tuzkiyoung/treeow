@@ -37,3 +37,8 @@ DEFAULT_PAGE_SIZE = 50
 # Storage Constants
 STORAGE_VERSION = 1
 STORAGE_KEY = "treeow"
+
+# Event Constants
+EVENT_DEVICE_CONTROL = 'device_control'
+EVENT_DEVICE_DATA_CHANGED = 'device_data_changed'
+EVENT_GATEWAY_STATUS_CHANGED = 'gateway_status_changed'

@@ -24,7 +24,6 @@ TOKEN_MAX_RETRY_DELAY = 300  # seconds (5 minutes max retry delay)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Optimized setup entry with reduced initialization time."""
-    # Initialize domain data with pre-allocated structures
     hass.data.setdefault(DOMAIN, {
         'devices': [],
         'signals': [],
@@ -52,7 +51,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.pop(DOMAIN, None)
         return False
 
-    # Start background tasks with optimized signal handling
     signals = hass.data[DOMAIN]['signals']
     
     # Token updater task
@@ -223,7 +221,6 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
         _LOGGER.warning('No devices available')
         return
 
-    # Pre-allocate entities list
     entities = []
     device_filter_config = DeviceFilterConfig(hass, entry)
     entity_filter_config = EntityFilterConfig(hass, entry)
@@ -248,6 +245,5 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
             except Exception as e:
                 _LOGGER.warning(f'Failed to create entity - device: {device.id}, attribute: {attribute.key}, error: {e}')
 
-    # Batch add entities
     if entities:
         async_add_entities(entities)
