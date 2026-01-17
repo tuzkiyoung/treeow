@@ -33,6 +33,7 @@ class TreeowAbstractEntity(Entity, ABC):
         self._device_id = device.id
         self._attr_unique_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
         self._attr_name = attribute.display_name
+        self._attr_suggested_object_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
         self._attr_should_poll = False
         self._attr_device_info = _get_device_info(device)
         
