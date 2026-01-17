@@ -41,9 +41,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = TreeowClient(hass, account_cfg.access_token)
     hass.data[DOMAIN]['client'] = client
     
-    # Load digital model cache from file (persistent across restarts)
-    await client._load_cache()
-    
     try:
         # Get devices
         devices = await client.get_devices()
