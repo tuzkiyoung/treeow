@@ -15,10 +15,63 @@ from custom_components.treeow import const
 from custom_components.treeow.const import (
     EVENT_DEVICE_CONTROL,
     EVENT_DEVICE_DATA_CHANGED,
-    EVENT_GATEWAY_STATUS_CHANGED
+    EVENT_GATEWAY_STATUS_CHANGED,
+    DEFAULT_APP_VERSION,
+    DEFAULT_IOS_VERSION
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def initialize_versions(hass: HomeAssistant) -> tuple[str, str]:
+    app_version = DEFAULT_APP_VERSION
+    ios_version = DEFAULT_IOS_VERSION
+
+    session = async_get_clientsession(hass)
+    async def get_app_version():
+        nonlocal app_version
+        try:
+            async with session.get(url=const.GET_APP_VERSION_API) as response:
+                content = await response.json(content_type=None)
+                results = content.get('results', [])
+                if results and results[0].get('trackName') == 'Treeow Home':
+                    version = results[0].get('version')
+                    if version and version.replace('.', '').isdigit():
+                        app_version = version
+                    else:
+                        _LOGGER.warning(f'Invalid app version format: {version}, using default')
+        except Exception as e:
+            _LOGGER.warning(f'Failed to get app version: {e}')
+    
+    async def get_ios_version():
+        nonlocal ios_version
+        try:
+            async with session.get(url=const.GET_IOS_VERSION_API) as response:
+                content = await response.json(content_type=None)
+                if content:
+                    result = content.get('result', {})
+                    latest = result.get('latest', {})
+                    version = latest.get('name')
+                    if version:
+                        if version.replace('.', '').isdigit():
+                            ios_version = version
+                        else:
+                            _LOGGER.warning(f'Invalid iOS version format: {version}, using default')
+        except Exception as e:
+            _LOGGER.warning(f'Failed to get iOS version: {e}')
+    
+    try:
+        # Get versions concurrently with timeout
+        await asyncio.wait_for(
+            asyncio.gather(get_app_version(), get_ios_version()),
+            timeout=10.0
+        )
+    except asyncio.TimeoutError:
+        _LOGGER.warning('Version initialization timed out after 10 seconds, using defaults')
+    except Exception as e:
+        _LOGGER.warning(f'Failed to initialize versions: {e}, using defaults')
+    
+    return app_version, ios_version
 
 
 class TokenInfo:
@@ -52,77 +105,19 @@ class TreeowClientException(Exception):
 class TreeowClient:
     """Optimized TreeowClient with improved performance and error handling."""
 
-    __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', 
-                 '_header_cache', '_init_task')
+    __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', '_header_cache')
 
-    def __init__(self, hass: HomeAssistant, access_token: str):
+    def __init__(self, hass: HomeAssistant, access_token: str, app_version: str = DEFAULT_APP_VERSION, ios_version: str = DEFAULT_IOS_VERSION):
         self._access_token = access_token
-        self._app_version = '1.1.8'
-        self._ios_version = '18.5'
+        self._app_version = app_version
+        self._ios_version = ios_version
         self._hass = hass
         self._session = async_get_clientsession(hass)
         self._header_cache = None
-        self._init_task = None
 
     @property
     def hass(self) -> HomeAssistant:
         return self._hass
-
-    async def initialize_versions(self) -> None:
-        """Initialize versions once during service startup."""
-        # If task already exists, wait for it to complete
-        if self._init_task is not None:
-            await self._init_task
-            return
-        
-        # Create task for initialization
-        async def _do_init():
-            try:
-                # Get versions concurrently for better performance
-                await asyncio.gather(
-                    self.get_app_version(),
-                    self.get_ios_version()
-                )
-                
-                if not self._app_version.replace('.', '').isdigit():
-                    _LOGGER.warning(f'Invalid app version format: {self._app_version}, using default')
-                    self._app_version = '1.1.8'
-                
-                if not self._ios_version.replace('.', '').isdigit():
-                    _LOGGER.warning(f'Invalid iOS version format: {self._ios_version}, using default')
-                    self._ios_version = '18.5'
-            except Exception as e:
-                _LOGGER.warning(f'Failed to initialize versions: {e}')
-        
-        self._init_task = asyncio.create_task(_do_init())
-        await self._init_task
-
-    async def get_app_version(self) -> None:
-        """Get app version with optimized error handling."""
-        try:
-            async with self._session.get(url=const.GET_APP_VERSION_API) as response:
-                content = await response.json(content_type=None)
-                results = content.get('results', [])
-                if results and results[0].get('trackName') == 'Treeow Home':
-                    self._app_version = results[0].get('version', self._app_version)
-        except Exception as e:
-            _LOGGER.warning(f'Failed to get app version: {e}')
-
-    async def get_ios_version(self) -> None:
-        """Get latest iOS version from endoflife.date API."""
-        try:
-            async with self._session.get(url=const.GET_IOS_VERSION_API) as response:
-                content = await response.json(content_type=None)
-                if content:
-                    result = content.get('result', {})
-                    latest = result.get('latest', {})
-                    version = latest.get('name')
-                    
-                    if version:
-                        self._ios_version = version
-                        _LOGGER.debug(f'Extracted iOS version: {version}')
-        except Exception as e:
-            _LOGGER.warning(f'Failed to get iOS version: {e}')
 
     async def login(self, account: str, password: str) -> TokenInfo:
         """Optimized login with better error handling."""
@@ -599,9 +594,7 @@ class TreeowClient:
             raise TreeowClientException(f'Failed to send command: {e}')
 
     async def _generate_common_headers(self) -> Dict[str, str]:
-        """Optimized header generation with caching and version auto-initialization."""
-        if self._init_task is None:
-            await self.initialize_versions()
+        """Optimized header generation with caching."""
         if self._header_cache is None:
             self._header_cache = {
                 "content-type": "application/json;charset=utf8",

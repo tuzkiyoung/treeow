@@ -18,7 +18,7 @@ from .const import (
     TOKEN_RETRY_MULTIPLIER,
     TOKEN_MAX_RETRY_DELAY
 )
-from .core.client import TreeowClient, TreeowClientException
+from .core.client import TreeowClient, TreeowClientException, initialize_versions
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,12 +35,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initialize client and token management
     account_cfg = AccountConfig(hass, entry)
     
-    # Try to update token first
-    await _try_update_token(hass, entry, account_cfg)
-    
-    # Create client once and reuse
-    client = TreeowClient(hass, account_cfg.access_token)
+    # Initialize versions and create client
+    app_version, ios_version = await initialize_versions(hass)
+    _LOGGER.debug(f'Initialized versions: app_version={app_version}, ios_version={ios_version}')
+    client = TreeowClient(hass, account_cfg.access_token, app_version, ios_version)
     hass.data[DOMAIN]['client'] = client
+    
+    # Verify and update token if needed
+    await _try_update_token(hass, entry, account_cfg)
     
     try:
         # Get devices
@@ -116,6 +118,7 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
     
     client = hass.data[DOMAIN].get('client')
     if client is None:
+        # Create temporary client with default versions for token operations
         client = TreeowClient(hass, account_cfg.access_token)
     
     try:

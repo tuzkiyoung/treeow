@@ -33,6 +33,8 @@ MAX_RETRY_DELAY = 60  # seconds
 
 # Other Constants
 DEFAULT_PAGE_SIZE = 50
+DEFAULT_APP_VERSION = '1.1.8'
+DEFAULT_IOS_VERSION = '18.5'
 
 # Storage Constants
 STORAGE_VERSION = 1
