@@ -49,7 +49,7 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(account): str,
                     vol.Required(password): str,
                     vol.Required('default_load_all_entity', default=True): bool,
-                    vol.Optional('poll_interval', default=DEFAULT_POLL_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                    vol.Required('poll_interval', default=DEFAULT_POLL_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
                 }
             ),
             errors=errors
@@ -116,7 +116,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required(account, default=cfg.account): str,
                     vol.Required(password, default=cfg.password): str,
                     vol.Required('default_load_all_entity', default=cfg.default_load_all_entity): bool,
-                    vol.Optional('poll_interval', default=cfg.poll_interval): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                    vol.Required('poll_interval', default=cfg.poll_interval): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
                 }
             ),
             errors=errors
