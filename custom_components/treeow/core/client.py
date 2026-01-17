@@ -49,8 +49,7 @@ class TreeowClient:
     """Optimized TreeowClient with improved performance and error handling."""
 
     __slots__ = ('_access_token', '_app_version', '_ios_version', '_hass', '_session', 
-                 '_header_cache', '_group_cache', '_group_cache_time', '_versions_initialized',
-                 '_digital_model_cache')
+                 '_header_cache', '_group_cache', '_group_cache_time', '_versions_initialized')
 
     def __init__(self, hass: HomeAssistant, access_token: str):
         self._access_token = access_token
@@ -62,7 +61,6 @@ class TreeowClient:
         self._group_cache = None
         self._group_cache_time = 0
         self._versions_initialized = False
-        self._digital_model_cache = {}  # 内存缓存: {device_id: {version: data}}
 
     @property
     def hass(self) -> HomeAssistant:
@@ -322,104 +320,47 @@ class TreeowClient:
             _LOGGER.error(f'Failed to get digital model for device {device.id}: {e}')
             raise TreeowClientException(f'Failed to get digital model for device {device.id}: {e}')
 
-    def _get_device_store(self, device_id: str) -> Store:
-        """获取设备专属的存储对象"""
-        return Store(self._hass, const.STORAGE_VERSION, f"{const.STORAGE_KEY}/{device_id}.json")
-
-    async def _load_device_cache(self, device_id: str) -> Dict[str, Any]:
-        """从文件加载单个设备的缓存"""
-        try:
-            store = self._get_device_store(device_id)
-            data = await store.async_load()
-            if data:
-                _LOGGER.debug(f'Loaded cache for device {device_id}')
-                return data
-            return {}
-        except Exception as e:
-            _LOGGER.warning(f'Failed to load cache for device {device_id}: {e}')
-            return {}
-
-    async def _save_device_cache(self, device_id: str, cache_data: Dict[str, Any]) -> None:
-        """保存单个设备的缓存到文件"""
-        try:
-            store = self._get_device_store(device_id)
-            await store.async_save(cache_data)
-            _LOGGER.debug(f'Saved cache for device {device_id}')
-        except Exception as e:
-            _LOGGER.error(f'Failed to save cache for device {device_id}: {e}')
-
     async def get_digital_model_from_cache(self, device: TreeowDevice) -> List[Dict[str, Any]]:
-        """永久缓存 + 版本控制，每个设备独立存储，只在设备版本变化或缓存不存在时更新。"""
-        device_id = device.id
+        """从缓存获取数字模型，若不存在或版本不匹配则从 API 获取并缓存"""
+        store = Store(
+            self._hass, 
+            const.STORAGE_VERSION, 
+            f'{const.STORAGE_KEY}/{device.category}_{device.id}.json'
+        )
         
-        # 检查内存缓存
-        if device_id in self._digital_model_cache:
-            cached = self._digital_model_cache[device_id]
-            if cached.get('version') == device.version:
-                _LOGGER.debug(f'Memory cache hit for device {device_id} (version {device.version})')
-                return cached['data']
-        
-        # 从文件加载设备缓存
-        device_cache = await self._load_device_cache(device_id)
-        
-        # 检查文件缓存是否匹配版本
-        if device_cache and device_cache.get('version') == device.version:
-            _LOGGER.debug(f'File cache hit for device {device_id} (version {device.version})')
-            # 更新内存缓存
-            self._digital_model_cache[device_id] = device_cache
-            return device_cache['data']
-        
-        # 缓存未命中或版本不匹配，重新获取
-        _LOGGER.info(f'Fetching digital model for device {device_id} (version {device.version})')
-        
+        cache = None
         try:
-            attributes = await self.get_digital_model(device)
-            
-            # 构建新缓存数据
-            new_cache = {
-                'data': attributes,
-                'version': device.version,
-                'device_id': device_id,
-                'updated_at': int(time.time())
-            }
-            
-            # 保存到内存缓存
-            self._digital_model_cache[device_id] = new_cache
-            
-            # 异步保存到设备专属文件
-            asyncio.create_task(self._save_device_cache(device_id, new_cache))
-            
-            return attributes
-            
+            cache = await store.async_load()
+            if isinstance(cache, str):
+                raise RuntimeError('Cache is invalid')
         except Exception as e:
-            # 如果获取失败，尝试使用旧版本缓存（容错）
-            _LOGGER.error(f'Failed to fetch digital model for device {device_id}: {e}')
-            if device_cache and device_cache.get('data'):
-                _LOGGER.warning(f'Using old cache version for device {device_id} due to API error')
-                return device_cache['data']
-            raise
+            _LOGGER.warning(f'Device {device.id} cache is invalid: {e}')
+            await store.async_remove()
+            cache = None
+        
+        # 检查缓存是否存在且版本匹配
+        if cache and cache.get('version') == device.version:
+            _LOGGER.info(f'Device {device.id} get digital model from cache (version {device.version})')
+            return cache['attributes']
+        
+        # 从 API 获取
+        _LOGGER.info(f'Device {device.id} fetching digital model from API (version {device.version})')
+        attributes = await self.get_digital_model(device)
+        
+        # 保存到缓存
+        await store.async_save({
+            'device': {
+                'id': device.id,
+                'name': device.name,
+                'category': device.category,
+                'version': device.version
+            },
+            'version': device.version,
+            'attributes': attributes
+        })
+        
+        return attributes
 
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """获取缓存统计信息，用于调试和监控。"""
-        if not self._digital_model_cache:
-            return {
-                'total_devices': 0,
-                'devices': [],
-                'memory_usage_mb': 0
-            }
-        
-        # 统计每个设备的缓存版本
-        device_versions = {}
-        for device_id, cache_entry in self._digital_model_cache.items():
-            version = cache_entry.get('version', 'unknown')
-            device_versions[device_id] = version
-        
-        return {
-            'total_devices': len(self._digital_model_cache),
-            'devices': list(self._digital_model_cache.keys()),
-            'device_versions': device_versions,
-            'memory_usage_mb': sum(len(str(v)) for v in self._digital_model_cache.values()) / (1024 * 1024)
-        }
 
     async def get_device_snapshot_data(self, device: TreeowDevice) -> Dict[str, Any]:
         """Optimized snapshot data retrieval."""
