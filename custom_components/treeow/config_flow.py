@@ -7,7 +7,7 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.config_validation import multi_select
 
-from .const import DOMAIN, FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE
+from .const import DOMAIN, FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE, DEFAULT_POLL_INTERVAL
 from .core.client import TreeowClientException, TreeowClient
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
 
@@ -34,7 +34,8 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         'access_token': token_info.access_token,
                         'refresh_token': token_info.refresh_token,
                         'expires_at': token_info.expires_at,
-                        'default_load_all_entity': user_input['default_load_all_entity']
+                        'default_load_all_entity': user_input['default_load_all_entity'],
+                        'poll_interval': user_input.get('poll_interval', DEFAULT_POLL_INTERVAL)
                     }
                 })
             except TreeowClientException as e:
@@ -48,6 +49,7 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(account): str,
                     vol.Required(password): str,
                     vol.Required('default_load_all_entity', default=True): bool,
+                    vol.Optional('poll_interval', default=DEFAULT_POLL_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
                 }
             ),
             errors=errors
@@ -97,6 +99,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 cfg.refresh_token = token_info.refresh_token
                 cfg.expires_at = token_info.expires_at
                 cfg.default_load_all_entity = user_input['default_load_all_entity']
+                cfg.poll_interval = user_input.get('poll_interval', DEFAULT_POLL_INTERVAL)
                 cfg.save()
 
                 await self.hass.config_entries.async_reload(self.config_entry.entry_id)
@@ -113,6 +116,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required(account, default=cfg.account): str,
                     vol.Required(password, default=cfg.password): str,
                     vol.Required('default_load_all_entity', default=cfg.default_load_all_entity): bool,
+                    vol.Optional('poll_interval', default=cfg.poll_interval): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
                 }
             ),
             errors=errors

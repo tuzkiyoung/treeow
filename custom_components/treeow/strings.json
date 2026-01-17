@@ -8,7 +8,8 @@
         "data": {
           "account": "Account",
           "password": "Password",
-          "default_load_all_entity": "Default load all entity"
+          "default_load_all_entity": "Default load all entity",
+          "poll_interval": "Poll interval (seconds)"
         },
         "description": "Enter your Treeow Account.",
         "title": "Configure account information"
@@ -32,7 +33,8 @@
         "data": {
           "account": "Account",
           "password": "Password",
-          "default_load_all_entity": "Default load all entity"
+          "default_load_all_entity": "Default load all entity",
+          "poll_interval": "Poll interval (seconds)"
         }
       },
       "device": {

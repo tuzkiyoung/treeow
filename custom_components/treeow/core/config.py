@@ -5,7 +5,7 @@ from typing import List
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from custom_components.treeow.const import FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE
+from custom_components.treeow.const import FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE, DEFAULT_POLL_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class AccountConfig:
         self.refresh_token: str = cfg.get('refresh_token', '')
         self.expires_at: int = cfg.get('expires_at', 0)
         self.default_load_all_entity: bool = cfg.get('default_load_all_entity', True)
+        self.poll_interval: int = cfg.get('poll_interval', DEFAULT_POLL_INTERVAL)
 
     def save(self):
         self._hass.config_entries.async_update_entry(
@@ -38,7 +39,8 @@ class AccountConfig:
                     'access_token': self.access_token,
                     'refresh_token': self.refresh_token,
                     'expires_at': self.expires_at,
-                    'default_load_all_entity': self.default_load_all_entity
+                    'default_load_all_entity': self.default_load_all_entity,
+                    'poll_interval': self.poll_interval
                 }
             }
         )

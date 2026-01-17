@@ -10,7 +10,8 @@
                 "data": {
                     "account": "账号",
                     "password": "密码",
-                    "default_load_all_entity": "默认加载所有实体"
+                    "default_load_all_entity": "默认加载所有实体",
+                    "poll_interval": "轮询间隔（秒）"
                 }
             }
         }
@@ -32,7 +33,8 @@
                 "data": {
                     "account": "账号",
                     "password": "密码",
-                    "default_load_all_entity": "默认加载所有实体"
+                    "default_load_all_entity": "默认加载所有实体",
+                    "poll_interval": "轮询间隔（秒）"
                 }
             },
             "device": {

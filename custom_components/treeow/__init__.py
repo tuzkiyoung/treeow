@@ -67,7 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_signal = threading.Event()
     signals.append(device_signal)
     hass.async_create_background_task(
-        client.listen_devices(devices, device_signal), 
+        client.listen_devices(devices, device_signal, account_cfg.poll_interval), 
         'treeow-listener'
     )
 

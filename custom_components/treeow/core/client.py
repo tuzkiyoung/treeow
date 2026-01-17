@@ -11,6 +11,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .device import TreeowDevice
 from .event import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import listen_event, fire_event
+from custom_components.treeow.const import DEFAULT_POLL_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,6 @@ GET_IOS_VERSION_API = 'https://endoflife.date/api/v1/products/ios/releases/lates
 
 CACHE_EXPIRATION = 3600  # 1 hour
 HEARTBEAT_INTERVAL = 10  # seconds
-DEVICE_POLL_INTERVAL = 1  # seconds
 RETRY_DELAY = 5  # seconds
 RETRY_MULTIPLIER = 2  # retry delay multiplier
 MAX_RETRY_DELAY = 60  # seconds
@@ -440,7 +440,7 @@ class TreeowClient:
             _LOGGER.error(f'Failed to get snapshot data for device {device.id}: {e}')
             raise TreeowClientException(f'Failed to get snapshot data for device {device.id}: {e}')
 
-    async def listen_devices(self, target_devices: List[TreeowDevice], signal: threading.Event) -> None:
+    async def listen_devices(self, target_devices: List[TreeowDevice], signal: threading.Event, poll_interval: int = DEFAULT_POLL_INTERVAL) -> None:
         """Optimized device listening with better resource management and exponential backoff retry."""
         process_id = str(uuid.uuid4())
         self._hass.data['current_listen_devices_process_id'] = process_id
@@ -449,6 +449,7 @@ class TreeowClient:
         heartbeat_tasks = []
         retry_delay = RETRY_DELAY  # Initial retry delay
         cache_cleanup_counter = 0  # 缓存清理计数器
+        cache_cleanup_threshold = max(3600 // poll_interval, 1)  # 约1小时清理一次缓存
         
         try:
             # Start heartbeat tasks
@@ -486,11 +487,11 @@ class TreeowClient:
                         tasks.append(task)
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
-                    await asyncio.sleep(DEVICE_POLL_INTERVAL)
+                    await asyncio.sleep(poll_interval)
                     
-                    # 定期清理过期缓存（每60次轮询清理一次，约1分钟）
+                    # 定期清理过期缓存（约1小时清理一次）
                     cache_cleanup_counter += 1
-                    if cache_cleanup_counter >= 60:
+                    if cache_cleanup_counter >= cache_cleanup_threshold:
                         self._cleanup_expired_cache()
                         cache_cleanup_counter = 0
                     
