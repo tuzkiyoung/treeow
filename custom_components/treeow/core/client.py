@@ -190,29 +190,23 @@ class TreeowClient:
             raise TreeowClientException(f'Token verification failed: {e}')
 
     async def get_devices(self) -> List[TreeowDevice]:
-        """Optimized device retrieval with parallel processing."""
+        """Get all devices from all groups."""
         try:
             group_ids = await self.get_groups()
             if not group_ids:
                 _LOGGER.warning('No device groups found')
                 return []
 
+            _LOGGER.debug(f'Found {len(group_ids)} group(s), fetching devices...')
             headers = await self._generate_common_headers()
             devices = []
             
-            # Process groups in parallel for better performance
-            tasks = []
             for group_id in group_ids:
-                task = self._get_devices_for_group(group_id, headers)
-                tasks.append(task)
-            
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for result in results:
-                if isinstance(result, list):
-                    devices.extend(result)
-                elif isinstance(result, Exception):
-                    _LOGGER.error(f'Failed to get device group: {result}')
+                try:
+                    group_devices = await self._get_devices_for_group(group_id, headers)
+                    devices.extend(group_devices)
+                except Exception as e:
+                    _LOGGER.error(f'Failed to get devices for group {group_id}: {e}')
 
             return devices
             
