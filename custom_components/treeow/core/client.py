@@ -400,7 +400,7 @@ class TreeowClient:
         retry_delay = const.RETRY_DELAY  # Initial retry delay
         
         # Create device ID to TreeowDevice mapping for quick lookup during control
-        device_map = {device.id: device for device in target_devices}
+        device_map = {str(device.id): device for device in target_devices}
         
         try:
             # Start heartbeat tasks
@@ -416,7 +416,7 @@ class TreeowClient:
             async def control_callback(event):
                 """Handle device control events asynchronously with immediate state polling."""
                 device_dict = event.data['device']
-                device_id = device_dict.get('id')
+                device_id = str(device_dict.get('id'))
                 
                 try:
                     await self._send_command(device_dict, event.data['attributes'])
@@ -547,7 +547,7 @@ class TreeowClient:
                     values[identifier] = data[identifier]
 
             fire_event(self._hass, EVENT_DEVICE_DATA_CHANGED, {
-                'deviceId': msg['id'],
+                'deviceId': str(msg['id']),
                 'attributes': values
             })
             
