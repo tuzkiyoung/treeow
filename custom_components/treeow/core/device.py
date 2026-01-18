@@ -95,12 +95,11 @@ class TreeowDevice:
     async def async_init(self):
         """Optimized initialization with better error handling."""
         try:
-            # Get snapshot data
-            snapshot_data = await self._client.get_device_snapshot_data(self)
+            # Get snapshot data and attributes in one call
+            snapshot_data, attributes = await self._client.get_device_snapshot_data(self)
 
             # Initialize parser once
             parser = V1SpecAttributeParser()
-            attributes = await self._client.get_digital_model_from_cache(self)
             parsed_attributes = []
             
             for item in attributes:

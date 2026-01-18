@@ -351,8 +351,8 @@ class TreeowClient:
         return attributes
 
 
-    async def get_device_snapshot_data(self, device: TreeowDevice) -> Dict[str, Any]:
-        """Optimized snapshot data retrieval."""
+    async def get_device_snapshot_data(self, device: TreeowDevice) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        """Optimized snapshot data retrieval with attribute definitions."""
         try:
             payload = {"id": device.id}
             headers = await self._generate_common_headers()
@@ -363,12 +363,12 @@ class TreeowClient:
                 
                 data = content.get('data')
                 if not data:
-                    return {}
+                    return {}, []
                 
                 # Parse device data
                 props = data.get('props', [])
                 if not props:
-                    return {}
+                    return {}, []
                 
                 value_data = json.loads(props[0]['value']).get(device.category, {})
                 
@@ -381,7 +381,7 @@ class TreeowClient:
                     if identifier and identifier in value_data:
                         values[identifier] = value_data[identifier]
                 
-                return values
+                return values, attributes
                 
         except TreeowClientException as e:
             _LOGGER.error(f'Failed to get snapshot data for device {device.id}: {e}')
@@ -417,19 +417,19 @@ class TreeowClient:
                 """Handle device control events asynchronously with immediate state polling."""
                 device_dict = event.data['device']
                 device_id = str(device_dict.get('id'))
+                command_attrs = event.data['attributes']
                 
                 try:
-                    await self._send_command(device_dict, event.data['attributes'])
-                    _LOGGER.debug(f'Command sent successfully for device {device_id}')
+                    await self._send_command(device_dict, command_attrs)
+                    _LOGGER.debug(f'Command sent successfully for device {device_id}: {command_attrs}')
                         
                 except Exception as e:
-                    _LOGGER.error(f'Failed to send command for device {device_id}: {e}')
+                    _LOGGER.error(f'Failed to send command for device {device_id} with attributes {command_attrs}: {e}')
 
                 try:
                     if device_id in device_map:
                         headers = await self._generate_common_headers()
                         await self._poll_device(device_map[device_id], headers)
-                        _LOGGER.debug(f'Immediately polled device {device_id} after control command')
                         
                 except Exception as e:
                     _LOGGER.error(f'Failed to poll device {device_id} after control: {e}')
@@ -452,7 +452,6 @@ class TreeowClient:
                         tasks.append(task)
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
-                    _LOGGER.debug(f'Polled {len(target_devices)} devices, next poll in {poll_interval}s')
                     await asyncio.sleep(poll_interval)
                     
                     # Reset retry delay on successful operation
