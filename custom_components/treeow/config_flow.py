@@ -140,7 +140,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         devices = {}
 
         for item in self.hass.data.get(DOMAIN, {}).get('devices', []):
-            devices[item.id] = item.name
+            devices[str(item.id)] = item.name
 
         return self.async_show_form(
             step_id="device",
@@ -167,7 +167,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         devices = {}
         for item in self.hass.data.get(DOMAIN, {}).get('devices', []):
-            devices[item.id] = item.name
+            devices[str(item.id)] = item.name
         return self.async_show_form(
             step_id="entity_device_selector",
             data_schema=vol.Schema(
@@ -198,7 +198,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         target_device_id = domain_data.pop('entity_filter_target_device', '')
         target_device = None
         for device in domain_data.get('devices', []):
-            if device.id == target_device_id:
+            if str(device.id) == target_device_id:
                 target_device = device
                 break
         

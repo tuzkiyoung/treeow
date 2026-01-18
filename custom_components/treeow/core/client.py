@@ -452,6 +452,7 @@ class TreeowClient:
                         tasks.append(task)
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
+                    _LOGGER.debug(f'Polled {len(target_devices)} devices, next poll in {poll_interval}s')
                     await asyncio.sleep(poll_interval)
                     
                     # Reset retry delay on successful operation

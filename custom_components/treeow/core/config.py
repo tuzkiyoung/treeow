@@ -56,7 +56,7 @@ class DeviceFilterConfig:
 
         cfg = config.data.get('device_filter', {})
         self._filter_type: str = cfg.get('filter_type', FILTER_TYPE_EXCLUDE)
-        self._target_devices: List[str] = cfg.get('target_devices', [])
+        self._target_devices: List[str] = [str(d) for d in cfg.get('target_devices', [])]
 
     def set_filter_type(self, filter_type: str):
         if filter_type not in [FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE]:
@@ -115,7 +115,7 @@ class EntityFilterConfig:
         self._config = config
         self._account_cfg = AccountConfig(hass, config)
         self._cfg: List[dict] = config.data.get('entity_filter', [])
-        self._cfg_index: dict = {item['device_id']: item for item in self._cfg}
+        self._cfg_index: dict = {str(item['device_id']): item for item in self._cfg}
 
     def set_filter_type(self, device_id: str, filter_type: str):
         if filter_type not in [FILTER_TYPE_EXCLUDE, FILTER_TYPE_INCLUDE]:
@@ -174,8 +174,6 @@ class EntityFilterConfig:
             data={
                 **self._config.data,
                 'entity_filter': self._cfg,
-                # async_update_entry 内部 entry.data != data 无法识别数组内容修改
-                # 所以额外添加更新时间用于修复配置无法保存的问题，没有实际用途
                 'entity_filter_updated_at': int(time.time())
             }
         )
@@ -183,7 +181,7 @@ class EntityFilterConfig:
     @staticmethod
     def _generate_entity_filer_item(device_id: str, filter_type: str = FILTER_TYPE_INCLUDE, target_entities: List[str] = None):
         return {
-            'device_id': device_id,
+            'device_id': str(device_id),  # Ensure device_id is always string
             'filter_type': filter_type,
             'target_entities': target_entities if target_entities is not None else []
         }

@@ -19,8 +19,7 @@ class TreeowAbstractEntity(Entity, ABC):
     __slots__ = ('_device', '_attribute', '_attributes_data', '_listen_cancel', '_device_id')
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
-        # Cache device ID to avoid repeated property access
-        self._device_id = device.id
+        self._device_id = str(device.id)
         self._attr_unique_id = f'{DOMAIN}_{self._device_id}_{attribute.key}'.lower()
         self.entity_id = f'{attribute.platform}.{self._attr_unique_id}'
         self._attr_name = attribute.display_name

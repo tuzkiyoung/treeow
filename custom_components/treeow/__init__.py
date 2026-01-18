@@ -186,7 +186,7 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
         _LOGGER.error('Device identifier is empty')
         return False
         
-    device_id = device_identifiers[0][1]
+    device_id = str(device_identifiers[0][1])
 
     # Find target device efficiently
     devices = hass.data[DOMAIN].get('devices', [])
@@ -194,7 +194,7 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
     
     for dev in devices:
         _LOGGER.debug(f'Comparing device: cloud_id={dev.id}, target_id={device_id}')
-        if str(dev.id) == str(device_id):
+        if str(dev.id) == device_id:
             target_device = dev
             break
     
@@ -206,9 +206,9 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
     try:
         cfg = DeviceFilterConfig(hass, config)
         if cfg.filter_type == FILTER_TYPE_EXCLUDE:
-            cfg.add_device(target_device.id)
+            cfg.add_device(str(target_device.id))
         else:
-            cfg.remove_device(target_device.id)
+            cfg.remove_device(str(target_device.id))
         cfg.save()
         
         return True
@@ -231,7 +231,7 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
     
     for device in devices:
         # Skip filtered devices
-        if device_filter_config.is_skip(device.id):
+        if device_filter_config.is_skip(str(device.id)):
             continue
 
         # Process device attributes
@@ -240,7 +240,7 @@ async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_a
                 continue
 
             # Skip filtered entities
-            if entity_filter_config.is_skip(device.id, attribute.key):
+            if entity_filter_config.is_skip(str(device.id), attribute.key):
                 continue
 
             try:
