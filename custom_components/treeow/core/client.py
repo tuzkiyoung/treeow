@@ -190,23 +190,24 @@ class TreeowClient:
             raise TreeowClientException(f'Token verification failed: {e}')
 
     async def get_devices(self) -> List[TreeowDevice]:
-        """Get all devices from all groups."""
+        """Get all devices from all groups with parallel processing."""
         try:
             group_ids = await self.get_groups()
             if not group_ids:
                 _LOGGER.warning('No device groups found')
                 return []
 
-            _LOGGER.debug(f'Found {len(group_ids)} group(s), fetching devices...')
             headers = await self._generate_common_headers()
-            devices = []
             
-            for group_id in group_ids:
-                try:
-                    group_devices = await self._get_devices_for_group(group_id, headers)
-                    devices.extend(group_devices)
-                except Exception as e:
-                    _LOGGER.error(f'Failed to get devices for group {group_id}: {e}')
+            tasks = [self._get_devices_for_group(group_id, headers) for group_id in group_ids]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            devices = []
+            for i, result in enumerate(results):
+                if isinstance(result, list):
+                    devices.extend(result)
+                elif isinstance(result, Exception):
+                    _LOGGER.error(f'Failed to get devices for group {group_ids[i]}: {result}')
 
             return devices
             
@@ -218,7 +219,7 @@ class TreeowClient:
             raise TreeowClientException(f'Failed to get device list: {e}')
 
     async def _get_devices_for_group(self, group_id: str, headers: Dict[str, str]) -> List[TreeowDevice]:
-        """Helper method to get devices for a specific group."""
+        """Helper method to get devices for a specific group with parallel initialization."""
         payload = {
             "pageSize": str(const.DEFAULT_PAGE_SIZE),
             "groupId": group_id,
@@ -229,13 +230,17 @@ class TreeowClient:
             content = await response.json(content_type=None)
             self._assert_response_successful(content)
             
+            if not content.get('data'):
+                return []
+            
+            # Create device objects
             devices = []
-            if content.get('data'):
-                for raw_device in content['data']:
-                    raw_device['groupId'] = group_id
-                    device = TreeowDevice(self, raw_device)
-                    await device.async_init()
-                    devices.append(device)
+            for raw_device in content['data']:
+                raw_device['groupId'] = group_id
+                device = TreeowDevice(self, raw_device)
+                devices.append(device)
+            
+            await asyncio.gather(*[device.async_init() for device in devices])
             
             return devices
 
