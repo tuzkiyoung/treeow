@@ -100,9 +100,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 cfg.expires_at = token_info.expires_at
                 cfg.default_load_all_entity = user_input['default_load_all_entity']
                 cfg.poll_interval = user_input.get('poll_interval', DEFAULT_POLL_INTERVAL)
-                cfg.save()
-
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                cfg.save()  # Will trigger update_listener which reloads the integration
 
                 return self.async_create_entry(title='', data={})
             except TreeowClientException as e:
