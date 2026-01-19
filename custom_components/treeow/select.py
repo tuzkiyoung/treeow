@@ -60,6 +60,9 @@ class TreeowSelect(TreeowAbstractEntity, SelectEntity):
 
     def select_option(self, option: str) -> None:
         """Select an option with optimized reverse lookup."""
+        if option == self._attr_current_option:
+            return
+            
         if option in self._reverse_comparison_table:
             command_value = self._reverse_comparison_table[option]
         else:

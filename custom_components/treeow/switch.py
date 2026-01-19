@@ -54,9 +54,13 @@ class TreeowSwitch(TreeowAbstractEntity, SwitchEntity):
 
     def turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
+        if self._attr_is_on:
+            return
         self._send_command({self._attr_key: True})
 
     def turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
+        if not self._attr_is_on:
+            return
         self._send_command({self._attr_key: False})
 

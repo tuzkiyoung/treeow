@@ -54,9 +54,13 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
 
     def turn_on(self, **kwargs: Any) -> None:
         """Turn the fan on."""
+        if self._attr_is_on:
+            return
         self._send_command({self._attr_key: True})
 
     def turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
+        if not self._attr_is_on:
+            return
         self._send_command({self._attr_key: False})
 
