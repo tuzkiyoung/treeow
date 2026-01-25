@@ -371,6 +371,9 @@ class TreeowClient:
                 
                 value_data = json.loads(props[0]['value']).get(device.category, {})
                 
+                # Debug logging for raw API data
+                _LOGGER.debug(f"[DEBUG] Device {device.id} raw value_data: {value_data}")
+                
                 # Get attributes and build snapshot
                 attributes = await self.get_digital_model_from_cache(device)
                 values = {}
@@ -379,6 +382,10 @@ class TreeowClient:
                     identifier = attribute.get('identifier')
                     if identifier and identifier in value_data:
                         values[identifier] = value_data[identifier]
+                
+                # Debug logging for parsed values
+                _LOGGER.debug(f"[DEBUG] Device {device.id} parsed values: {values}")
+                _LOGGER.debug(f"[DEBUG] Device {device.id} attribute identifiers: {[attr.get('identifier') for attr in attributes]}")
                 
                 return values, attributes
                 

@@ -39,6 +39,16 @@ class TreeowSensor(TreeowAbstractEntity, SensorEntity):
     def _update_value(self):
         """Optimized value update with temperature/humidity value processing."""
         value = self._attributes_data.get(self._attribute.key)
+        
+        # Debug logging for runtime_total sensor
+        if 'runtime' in self._attribute.key or '累计' in self._attribute.display_name:
+            _LOGGER.debug(
+                f"[DEBUG] Sensor {self.entity_id} ({self._attribute.display_name}): "
+                f"key={self._attribute.key}, "
+                f"value={value}, "
+                f"all_data={self._attributes_data}"
+            )
+        
         if value is None:
             self._attr_native_value = None
             return

@@ -64,15 +64,36 @@ class TreeowAbstractEntity(Entity, ABC):
                 return
             
             self._attributes_data = event_data['attributes']
+            
+            # Debug logging for runtime sensors during data update
+            if 'runtime' in self._attribute.key or '累计' in self._attr_name:
+                _LOGGER.debug(
+                    f"[DEBUG] Entity {self.entity_id} data callback: "
+                    f"attribute_key={self._attribute.key}, "
+                    f"attribute_name={self._attr_name}, "
+                    f"new_attributes_data={self._attributes_data}"
+                )
+            
             self._update_value()
             self.schedule_update_ha_state()
 
         self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_DATA_CHANGED, data_callback))
 
         # Initialize with snapshot data
+        snapshot_data = self._device.attribute_snapshot_data
+        
+        # Debug logging for initial snapshot data
+        if 'runtime' in self._attribute.key or '累计' in self._attr_name:
+            _LOGGER.debug(
+                f"[DEBUG] Entity {self.entity_id} initialization: "
+                f"attribute_key={self._attribute.key}, "
+                f"attribute_name={self._attr_name}, "
+                f"snapshot_data={snapshot_data}"
+            )
+        
         data_callback(Event('', data={
             'deviceId': self._device_id,
-            'attributes': self._device.attribute_snapshot_data
+            'attributes': snapshot_data
         }))
 
     async def async_will_remove_from_hass(self) -> None:

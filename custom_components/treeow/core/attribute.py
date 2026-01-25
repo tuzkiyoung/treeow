@@ -162,6 +162,18 @@ class V1SpecAttributeParser(TreeowAttributeParser):
                 options['state_class'] = state_class
             if unit:
                 options['native_unit_of_measurement'] = unit
+        
+        # Debug logging for runtime sensors
+        identifier = attribute['identifier']
+        if 'runtime' in identifier or '累计' in display_name or '工作时间' in display_name:
+            _LOGGER.debug(
+                f"[DEBUG] Parsed sensor: identifier={identifier}, "
+                f"display_name={display_name}, "
+                f"state_class={options.get('state_class')}, "
+                f"device_class={options.get('device_class')}, "
+                f"unit={options.get('native_unit_of_measurement')}, "
+                f"schema={schema}"
+            )
 
         return TreeowAttribute(attribute['identifier'], display_name, Platform.SENSOR, options, ext)
 
