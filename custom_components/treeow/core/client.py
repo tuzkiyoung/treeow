@@ -369,10 +369,18 @@ class TreeowClient:
                 if not props:
                     return {}, []
                 
-                value_data = json.loads(props[0]['value']).get(device.category, {})
+                # Debug: Print complete API response
+                _LOGGER.debug(f"[DEBUG] Device {device.id} FULL API data: {data}")
+                
+                # Debug: Print complete props value
+                full_value = json.loads(props[0]['value'])
+                _LOGGER.debug(f"[DEBUG] Device {device.id} FULL props value (all categories): {full_value}")
+                _LOGGER.debug(f"[DEBUG] Device {device.id} device category: {device.category}")
+                
+                value_data = full_value.get(device.category, {})
                 
                 # Debug logging for raw API data
-                _LOGGER.debug(f"[DEBUG] Device {device.id} raw value_data: {value_data}")
+                _LOGGER.debug(f"[DEBUG] Device {device.id} value_data (filtered by category): {value_data}")
                 
                 # Get attributes and build snapshot
                 attributes = await self.get_digital_model_from_cache(device)
@@ -543,6 +551,12 @@ class TreeowClient:
             props = msg.get('props', [])
             if not props:
                 return
+            
+            # Debug: Print complete message for device 19673
+            if str(msg.get('id')) == '19673':
+                _LOGGER.debug(f"[DEBUG] Device {msg['id']} FULL message in _parse_message: {msg}")
+                full_value = json.loads(props[0]['value'])
+                _LOGGER.debug(f"[DEBUG] Device {msg['id']} FULL props value in update: {full_value}")
                 
             data = json.loads(props[0]['value']).get(msg['category'], {})
             values = {}
