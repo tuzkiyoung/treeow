@@ -106,10 +106,11 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
             self._attr_supported_features |= FanEntityFeature.PRESET_MODE
             self._attr_preset_modes = self._mode_options
         
-        _LOGGER.debug(
-            f'Fan [{self._attr_unique_id}] initialized with switch={self._switch_key}, '
-            f'speed={self._speed_key}, mode={self._mode_key}, '
-            f'speed_options={self._speed_options}, mode_options={self._mode_options}, '
+        _LOGGER.info(
+            f'Fan [{self._attr_unique_id}] initialized: '
+            f'switch={self._switch_key}, speed={self._speed_key}, mode={self._mode_key}, '
+            f'speed_options={self._speed_options}, speed_count={self._attr_speed_count if hasattr(self, "_attr_speed_count") else "N/A"}, '
+            f'mode_options={self._mode_options}, '
             f'supported_features={self._attr_supported_features}'
         )
 
@@ -142,6 +143,10 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
                         self._attr_percentage = ordered_list_item_to_percentage(
                             self._speed_options, display_value
                         )
+                        _LOGGER.debug(
+                            f'Fan [{self._attr_unique_id}] speed updated: '
+                            f'device_value={speed_value}, display={display_value}, percentage={self._attr_percentage}'
+                        )
                     except ValueError:
                         self._attr_percentage = 0
                         _LOGGER.warning(
@@ -149,6 +154,10 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
                         )
                 else:
                     self._attr_percentage = 0
+                    _LOGGER.debug(
+                        f'Fan [{self._attr_unique_id}] speed value not in options: '
+                        f'device_value={speed_value}, display={display_value}'
+                    )
             else:
                 self._attr_percentage = 0
         
@@ -159,10 +168,19 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
                 display_mode = self._mode_comparison_table.get(mode_value)
                 if display_mode in self._mode_options:
                     self._attr_preset_mode = display_mode
+                    _LOGGER.debug(
+                        f'Fan [{self._attr_unique_id}] mode updated: '
+                        f'device_value={mode_value}, display={display_mode}'
+                    )
                 else:
                     self._attr_preset_mode = None
             else:
                 self._attr_preset_mode = None
+        
+        _LOGGER.debug(
+            f'Fan [{self._attr_unique_id}] state updated: '
+            f'is_on={self._attr_is_on}, percentage={self._attr_percentage}, mode={self._attr_preset_mode}'
+        )
 
     async def async_turn_on(
         self,
@@ -173,10 +191,9 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
         """Turn on the fan."""
         commands = {}
         
-        # Turn on switch
-        if self._switch_key:
-            if not self._attr_is_on:
-                commands[self._switch_key] = True
+        # Always turn on switch if not already on
+        if self._switch_key and not self._attr_is_on:
+            commands[self._switch_key] = True
         
         # Set speed if provided
         if percentage is not None and self._speed_key and self._speed_options:
@@ -188,7 +205,12 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
         if preset_mode is not None and self._mode_key and preset_mode in self._mode_reverse_table:
             commands[self._mode_key] = self._mode_reverse_table[preset_mode]
         
+        # If no specific commands and fan is off, at least turn it on
+        if not commands and self._switch_key and not self._attr_is_on:
+            commands[self._switch_key] = True
+        
         if commands:
+            _LOGGER.debug(f'Fan [{self._attr_unique_id}] turning on with commands: {commands}')
             self._send_command(commands)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -200,6 +222,7 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
         if not self._attr_is_on:
             return
         
+        _LOGGER.debug(f'Fan [{self._attr_unique_id}] turning off')
         self._send_command({self._switch_key: False})
 
     async def async_set_percentage(self, percentage: int) -> None:
@@ -221,6 +244,10 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
         speed_option = percentage_to_ordered_list_item(self._speed_options, percentage)
         if speed_option in self._speed_reverse_table:
             commands[self._speed_key] = self._speed_reverse_table[speed_option]
+            _LOGGER.debug(
+                f'Fan [{self._attr_unique_id}] setting percentage: {percentage}% -> '
+                f'{speed_option} (value={self._speed_reverse_table[speed_option]})'
+            )
             self._send_command(commands)
         else:
             _LOGGER.warning(f'Fan [{self._attr_unique_id}] invalid speed option: {speed_option}')
@@ -241,5 +268,6 @@ class TreeowFan(TreeowAbstractEntity, FanEntity):
             commands[self._switch_key] = True
         
         commands[self._mode_key] = self._mode_reverse_table[preset_mode]
+        _LOGGER.debug(f'Fan [{self._attr_unique_id}] setting preset mode: {preset_mode}')
         self._send_command(commands)
 

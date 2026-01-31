@@ -9,7 +9,7 @@
 [![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=treeow)
 
-**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant. This custom component enables seamless integration of Treeow smart appliances into your smart home ecosystem.
+**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant.
 
 **树新风 Home Assistant 集成** - 将树新风智能家居设备（空气净化器、加湿器）接入 Home Assistant，实现智能家居统一控制。
 
@@ -20,7 +20,7 @@
 ## English
 
 > [!NOTE]
-> Treeow has 2 official apps. This integration **only supports devices from Treeow Home app**. Devices from the regular Treeow app are not supported.
+> This integration **only supports devices from Treeow Home app**. Devices from the regular Treeow app are not supported.
 
 ### Features
 
@@ -42,46 +42,11 @@
 
 ### Supported Entity Types
 
-- **Fan** - Unified fan control with speed and preset modes (auto-created when device has switch + fan_speed_enum)
+- **Fan** - Unified control with speed (percentage) and preset modes
 - **Switch** - Power on/off, child lock, display, etc.
-- **Number** - Fan speed, target humidity, timer, etc.
-- **Select** - Operating modes, fan modes, etc.
+- **Number** - Target humidity, timer, etc.
+- **Select** - Operating modes, fan speed levels, etc.
 - **Sensor** - Air quality, humidity, temperature, filter life, etc.
-
-#### Fan Entity Features
-
-When a device has `switch`, `fan_speed_enum`, and optionally `mode` attributes, a unified fan entity will be automatically created with the following features:
-
-- **Power Control** - Turn the fan on/off
-- **Speed Control** - Adjust fan speed with percentage (0-100%)
-- **Preset Modes** - Select from available operation modes
-- **Combined Commands** - Set multiple attributes (power, speed, mode) in a single command
-
-**Usage Example:**
-
-```yaml
-# Turn on fan with speed and mode
-service: fan.turn_on
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  percentage: 75
-  preset_mode: "Strong Mode"
-
-# Set fan speed
-service: fan.set_percentage
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  percentage: 50
-
-# Set preset mode
-service: fan.set_preset_mode
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  preset_mode: "Sleep Mode"
-```
 
 ### Installation
 
@@ -89,7 +54,7 @@ data:
 
 [![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
 
-1. Click the button above to open Treeow in HACS directly
+1. Click the button above to open Treeow in HACS
 2. Click "Download"
 3. Restart Home Assistant
 
@@ -126,11 +91,11 @@ logger:
 ## 中文
 
 > [!NOTE]
-> 树新风官方有2个app，本集成**只支持 Treeow Home** 中的设备。Treeow app 中的设备无法使用本集成。
+> 本集成**只支持 Treeow Home** 中的设备。Treeow app 中的设备无法使用本集成。
 
 ### 简介
 
-本插件可将**树新风 Treeow Home** 中的设备接入 **Home Assistant** 智能家居平台，实现设备的统一管理和自动化控制。理论上支持所有 Treeow Home 下设备。
+本插件可将**树新风 Treeow Home** 中的设备接入 **Home Assistant** 智能家居平台，实现设备的统一管理和自动化控制。
 
 ### 功能特点
 
@@ -152,46 +117,11 @@ logger:
 
 ### 已支持实体类型
 
-- **Fan（风扇）** - 统一的风扇控制，支持风速和模式（当设备具有 switch + fan_speed_enum 时自动创建）
+- **Fan（风扇）** - 统一控制，支持风速百分比和预设模式
 - **Switch（开关）** - 电源开关、童锁、显示屏等
-- **Number（数值）** - 风速、目标湿度、定时器等
+- **Number（数值）** - 目标湿度、定时器等
 - **Select（选择）** - 运行模式、风速档位等
 - **Sensor（传感器）** - 空气质量、湿度、温度、滤芯寿命等
-
-#### Fan 实体功能
-
-当设备同时具有 `switch`、`fan_speed_enum`，以及可选的 `mode` 属性时，系统会自动创建一个统一的 fan 实体，具有以下功能：
-
-- **电源控制** - 打开/关闭风扇
-- **风速控制** - 使用百分比调节风速（0-100%）
-- **预设模式** - 选择可用的运行模式
-- **组合命令** - 一次性设置多个属性（电源、风速、模式）
-
-**使用示例：**
-
-```yaml
-# 打开风扇并设置风速和模式
-service: fan.turn_on
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  percentage: 75
-  preset_mode: "强力模式"
-
-# 调节风速
-service: fan.set_percentage
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  percentage: 50
-
-# 切换模式
-service: fan.set_preset_mode
-target:
-  entity_id: fan.treeow_19673_air_purifier
-data:
-  preset_mode: "睡眠模式"
-```
 
 ### 安装方式
 
