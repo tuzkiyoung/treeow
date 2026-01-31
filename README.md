@@ -42,10 +42,46 @@
 
 ### Supported Entity Types
 
+- **Fan** - Unified fan control with speed and preset modes (auto-created when device has switch + fan_speed_enum)
 - **Switch** - Power on/off, child lock, display, etc.
 - **Number** - Fan speed, target humidity, timer, etc.
 - **Select** - Operating modes, fan modes, etc.
 - **Sensor** - Air quality, humidity, temperature, filter life, etc.
+
+#### Fan Entity Features
+
+When a device has `switch`, `fan_speed_enum`, and optionally `mode` attributes, a unified fan entity will be automatically created with the following features:
+
+- **Power Control** - Turn the fan on/off
+- **Speed Control** - Adjust fan speed with percentage (0-100%)
+- **Preset Modes** - Select from available operation modes
+- **Combined Commands** - Set multiple attributes (power, speed, mode) in a single command
+
+**Usage Example:**
+
+```yaml
+# Turn on fan with speed and mode
+service: fan.turn_on
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  percentage: 75
+  preset_mode: "Strong Mode"
+
+# Set fan speed
+service: fan.set_percentage
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  percentage: 50
+
+# Set preset mode
+service: fan.set_preset_mode
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  preset_mode: "Sleep Mode"
+```
 
 ### Installation
 
@@ -116,10 +152,46 @@ logger:
 
 ### 已支持实体类型
 
+- **Fan（风扇）** - 统一的风扇控制，支持风速和模式（当设备具有 switch + fan_speed_enum 时自动创建）
 - **Switch（开关）** - 电源开关、童锁、显示屏等
 - **Number（数值）** - 风速、目标湿度、定时器等
 - **Select（选择）** - 运行模式、风速档位等
 - **Sensor（传感器）** - 空气质量、湿度、温度、滤芯寿命等
+
+#### Fan 实体功能
+
+当设备同时具有 `switch`、`fan_speed_enum`，以及可选的 `mode` 属性时，系统会自动创建一个统一的 fan 实体，具有以下功能：
+
+- **电源控制** - 打开/关闭风扇
+- **风速控制** - 使用百分比调节风速（0-100%）
+- **预设模式** - 选择可用的运行模式
+- **组合命令** - 一次性设置多个属性（电源、风速、模式）
+
+**使用示例：**
+
+```yaml
+# 打开风扇并设置风速和模式
+service: fan.turn_on
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  percentage: 75
+  preset_mode: "强力模式"
+
+# 调节风速
+service: fan.set_percentage
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  percentage: 50
+
+# 切换模式
+service: fan.set_preset_mode
+target:
+  entity_id: fan.treeow_19673_switch
+data:
+  preset_mode: "睡眠模式"
+```
 
 ### 安装方式
 

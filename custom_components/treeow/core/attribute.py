@@ -140,6 +140,16 @@ class V1SpecAttributeParser(TreeowAttributeParser):
                 if attr['identifier'] == 'fan':
                     yield self._parse_as_fan(attr)
                     break
+        
+        # Check for fan pattern with speed and mode control
+        # Create a fan entity if we have switch + fan_speed_enum, optionally with mode
+        if 'switch' in attribute_keys and 'fan_speed_enum' in attribute_keys:
+            # Create a virtual fan attribute for the fan entity
+            # Use switch attribute as base since it's the main control
+            for attr in attributes:
+                if attr['identifier'] == 'switch':
+                    yield self._parse_as_fan(attr)
+                    break
 
     def _parse_as_fan(self, attribute: dict) -> TreeowAttribute:
         """Optimized fan parsing."""
