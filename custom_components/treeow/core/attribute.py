@@ -40,7 +40,6 @@ IDENTIFIER_MAPPINGS = {
 
 
 class TreeowAttribute:
-    """Optimized attribute class with slots for better memory usage."""
 
     __slots__ = ('_key', '_display_name', '_platform', '_options', '_ext')
 
@@ -84,11 +83,9 @@ class TreeowAttributeParser(ABC):
 
 
 class V1SpecAttributeParser(TreeowAttributeParser):
-    """Optimized parser with caching and improved performance."""
 
     @lru_cache(maxsize=128)
     def _get_display_name(self, title: str) -> str:
-        """Cached display name extraction."""
         try:
             return json.loads(title)['zh']
         except (json.JSONDecodeError, KeyError) as e:
@@ -96,7 +93,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
             return title
 
     def parse_attribute(self, attribute: dict, snapshot_data: dict) -> Optional[TreeowAttribute]:
-        """Optimized attribute parsing with early returns."""
         identifier = attribute.get("identifier")
         if not identifier or identifier not in snapshot_data:
             return None
@@ -116,7 +112,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         return None
 
     def _parse_readwrite_attribute(self, attribute: dict, schema: dict) -> Optional[TreeowAttribute]:
-        """Optimized parsing for read-write attributes."""
         schema_type = schema.get('type')
         
         if schema_type == 'boolean':
@@ -129,63 +124,29 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         return None
 
     def parse_global(self, attributes: List[dict], device_category: str = None):
-        """Optimized global attribute parsing."""
         # Use set for O(1) lookup, filter out attributes without identifier
         attribute_keys = set()
         for attr in attributes:
             if attr.get('identifier'):
                 attribute_keys.add(attr.get('identifier'))
         
-        # Check for fan pattern with speed and mode control (priority)
-        # Create a fan entity if we have switch + fan_speed_enum, optionally with mode
         if 'switch' in attribute_keys and 'fan_speed_enum' in attribute_keys:
-            # Determine fan entity identifier based on device category
             fan_identifier = self._get_fan_identifier(device_category)
-            # Create a virtual fan attribute for the fan entity
-            # Display name will be overridden by device name in TreeowFan
             yield TreeowAttribute(fan_identifier, '风扇', Platform.FAN)
-        # Otherwise, check for simple air purifier pattern (fallback)
         elif {'pm25', 'filter', 'fan'}.issubset(attribute_keys):
-            # Find the first matching attribute for the fan
             for attr in attributes:
                 if attr['identifier'] == 'fan':
                     yield self._parse_as_fan(attr)
                     break
     
     def _get_fan_identifier(self, device_category: str) -> str:
-        """Get appropriate fan entity identifier based on device category."""
-        if not device_category:
-            return 'fan_entity'
-        
-        # Map common device categories to appropriate identifiers
-        category_lower = device_category.lower()
-        
-        # Air purifier patterns
-        if any(keyword in category_lower for keyword in ['air_purifier', 'purifier', '空气净化', '净化器']):
-            return 'air_purifier'
-        # Humidifier patterns
-        elif any(keyword in category_lower for keyword in ['humidifier', '加湿', '加湿器']):
-            return 'humidifier'
-        # Dehumidifier patterns
-        elif any(keyword in category_lower for keyword in ['dehumidifier', '除湿', '除湿器']):
-            return 'dehumidifier'
-        # Fresh air system patterns
-        elif any(keyword in category_lower for keyword in ['fresh_air', 'ventilator', '新风', '换气']):
-            return 'fresh_air_system'
-        # Generic fan patterns
-        elif any(keyword in category_lower for keyword in ['fan', '风扇', '电风扇']):
-            return 'fan'
-        # Default fallback
-        else:
-            return 'fan_entity'
+        return device_category.lower() if device_category else 'fan_entity'
 
     def _parse_as_fan(self, attribute: dict) -> TreeowAttribute:
-        """Optimized fan parsing."""
         display_name = self._get_display_name(attribute.get('title', ''))
         return TreeowAttribute(attribute['identifier'], display_name, Platform.FAN)
 
     def _parse_as_sensor(self, attribute: dict) -> TreeowAttribute:
-        """Optimized sensor parsing with cached lookups."""
         display_name = self._get_display_name(attribute.get('title', ''))
         options = {}
         ext = {}
@@ -204,7 +165,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         return TreeowAttribute(attribute['identifier'], display_name, Platform.SENSOR, options, ext)
 
     def _parse_as_number(self, attribute: dict) -> TreeowAttribute:
-        """Optimized number parsing."""
         display_name = self._get_display_name(attribute.get('title', ''))
         schema = attribute.get('schema', {})
         
@@ -222,7 +182,6 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         return TreeowAttribute(attribute['identifier'], display_name, Platform.NUMBER, options)
 
     def _parse_as_select(self, attribute: dict) -> TreeowAttribute:
-        """Optimized select parsing with better error handling."""
         display_name = self._get_display_name(attribute.get('title', ''))
         schema = attribute.get('schema', {})
         
@@ -246,13 +205,11 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         return TreeowAttribute(attribute['identifier'], display_name, Platform.SELECT, options, ext)
 
     def _parse_as_switch(self, attribute: dict) -> TreeowAttribute:
-        """Optimized switch parsing."""
         display_name = self._get_display_name(attribute.get('title', ''))
         options = {'device_class': SwitchDeviceClass.SWITCH}
         return TreeowAttribute(attribute['identifier'], display_name, Platform.SWITCH, options)
 
     def _guess_state_class_device_class_and_unit(self, attribute: dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """Optimized state class, device class and unit detection."""
         identifier = attribute.get('identifier', '')
         display_name = self._get_display_name(attribute.get('title', ''))
         
