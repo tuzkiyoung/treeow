@@ -79,7 +79,7 @@ class TreeowAttributeParser(ABC):
         pass
 
     @abstractmethod
-    def parse_global(self, attributes: List[dict]):
+    def parse_global(self, attributes: List[dict], device_category: str = None):
         pass
 
 
@@ -128,28 +128,56 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         
         return None
 
-    def parse_global(self, attributes: List[dict]):
+    def parse_global(self, attributes: List[dict], device_category: str = None):
         """Optimized global attribute parsing."""
         # Use set for O(1) lookup, filter out attributes without identifier
-        attribute_keys = {attr.get('identifier') for attr in attributes if attr.get('identifier')}
+        attribute_keys = set()
+        for attr in attributes:
+            if attr.get('identifier'):
+                attribute_keys.add(attr.get('identifier'))
         
-        # Check for air purifier pattern
-        if {'pm25', 'filter', 'fan'}.issubset(attribute_keys):
+        # Check for fan pattern with speed and mode control (priority)
+        # Create a fan entity if we have switch + fan_speed_enum, optionally with mode
+        if 'switch' in attribute_keys and 'fan_speed_enum' in attribute_keys:
+            # Determine fan entity identifier based on device category
+            fan_identifier = self._get_fan_identifier(device_category)
+            # Create a virtual fan attribute for the fan entity
+            # Display name will be overridden by device name in TreeowFan
+            yield TreeowAttribute(fan_identifier, '风扇', Platform.FAN)
+        # Otherwise, check for simple air purifier pattern (fallback)
+        elif {'pm25', 'filter', 'fan'}.issubset(attribute_keys):
             # Find the first matching attribute for the fan
             for attr in attributes:
                 if attr['identifier'] == 'fan':
                     yield self._parse_as_fan(attr)
                     break
+    
+    def _get_fan_identifier(self, device_category: str) -> str:
+        """Get appropriate fan entity identifier based on device category."""
+        if not device_category:
+            return 'fan_entity'
         
-        # Check for fan pattern with speed and mode control
-        # Create a fan entity if we have switch + fan_speed_enum, optionally with mode
-        if 'switch' in attribute_keys and 'fan_speed_enum' in attribute_keys:
-            # Create a virtual fan attribute for the fan entity
-            # Use switch attribute as base since it's the main control
-            for attr in attributes:
-                if attr['identifier'] == 'switch':
-                    yield self._parse_as_fan(attr)
-                    break
+        # Map common device categories to appropriate identifiers
+        category_lower = device_category.lower()
+        
+        # Air purifier patterns
+        if any(keyword in category_lower for keyword in ['air_purifier', 'purifier', '空气净化', '净化器']):
+            return 'air_purifier'
+        # Humidifier patterns
+        elif any(keyword in category_lower for keyword in ['humidifier', '加湿', '加湿器']):
+            return 'humidifier'
+        # Dehumidifier patterns
+        elif any(keyword in category_lower for keyword in ['dehumidifier', '除湿', '除湿器']):
+            return 'dehumidifier'
+        # Fresh air system patterns
+        elif any(keyword in category_lower for keyword in ['fresh_air', 'ventilator', '新风', '换气']):
+            return 'fresh_air_system'
+        # Generic fan patterns
+        elif any(keyword in category_lower for keyword in ['fan', '风扇', '电风扇']):
+            return 'fan'
+        # Default fallback
+        else:
+            return 'fan_entity'
 
     def _parse_as_fan(self, attribute: dict) -> TreeowAttribute:
         """Optimized fan parsing."""

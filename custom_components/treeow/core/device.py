@@ -115,7 +115,7 @@ class TreeowDevice:
 
             # Process global attributes
             try:
-                global_attrs = parser.parse_global(attributes)
+                global_attrs = parser.parse_global(attributes, self.category)
                 if global_attrs:
                     self._attributes.extend(global_attrs)
             except Exception as e:

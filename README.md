@@ -63,7 +63,7 @@ When a device has `switch`, `fan_speed_enum`, and optionally `mode` attributes, 
 # Turn on fan with speed and mode
 service: fan.turn_on
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   percentage: 75
   preset_mode: "Strong Mode"
@@ -71,14 +71,14 @@ data:
 # Set fan speed
 service: fan.set_percentage
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   percentage: 50
 
 # Set preset mode
 service: fan.set_preset_mode
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   preset_mode: "Sleep Mode"
 ```
@@ -173,7 +173,7 @@ logger:
 # 打开风扇并设置风速和模式
 service: fan.turn_on
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   percentage: 75
   preset_mode: "强力模式"
@@ -181,14 +181,14 @@ data:
 # 调节风速
 service: fan.set_percentage
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   percentage: 50
 
 # 切换模式
 service: fan.set_preset_mode
 target:
-  entity_id: fan.treeow_19673_switch
+  entity_id: fan.treeow_19673_air_purifier
 data:
   preset_mode: "睡眠模式"
 ```
