@@ -9,7 +9,7 @@
 [![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=treeow)
 
-**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant. This custom component enables seamless integration of Treeow smart appliances into your smart home ecosystem.
+**Treeow Home integration for Home Assistant** - Control your Treeow smart home devices (air purifiers, humidifiers) directly from Home Assistant.
 
 **树新风 Home Assistant 集成** - 将树新风智能家居设备（空气净化器、加湿器）接入 Home Assistant，实现智能家居统一控制。
 
@@ -20,7 +20,7 @@
 ## English
 
 > [!NOTE]
-> Treeow has 2 official apps. This integration **only supports devices from Treeow Home app**. Devices from the regular Treeow app are not supported.
+> This integration **only supports devices from Treeow Home app**. Devices from the regular Treeow app are not supported.
 
 ### Features
 
@@ -42,9 +42,10 @@
 
 ### Supported Entity Types
 
+- **Fan** - Unified control with speed (percentage) and preset modes
 - **Switch** - Power on/off, child lock, display, etc.
-- **Number** - Fan speed, target humidity, timer, etc.
-- **Select** - Operating modes, fan modes, etc.
+- **Number** - Target humidity, timer, etc.
+- **Select** - Operating modes, fan speed levels, etc.
 - **Sensor** - Air quality, humidity, temperature, filter life, etc.
 
 ### Installation
@@ -53,7 +54,7 @@
 
 [![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tuzkiyoung&repository=treeow&category=integration)
 
-1. Click the button above to open Treeow in HACS directly
+1. Click the button above to open Treeow in HACS
 2. Click "Download"
 3. Restart Home Assistant
 
@@ -90,11 +91,11 @@ logger:
 ## 中文
 
 > [!NOTE]
-> 树新风官方有2个app，本集成**只支持 Treeow Home** 中的设备。Treeow app 中的设备无法使用本集成。
+> 本集成**只支持 Treeow Home** 中的设备。Treeow app 中的设备无法使用本集成。
 
 ### 简介
 
-本插件可将**树新风 Treeow Home** 中的设备接入 **Home Assistant** 智能家居平台，实现设备的统一管理和自动化控制。理论上支持所有 Treeow Home 下设备。
+本插件可将**树新风 Treeow Home** 中的设备接入 **Home Assistant** 智能家居平台，实现设备的统一管理和自动化控制。
 
 ### 功能特点
 
@@ -116,8 +117,9 @@ logger:
 
 ### 已支持实体类型
 
+- **Fan（风扇）** - 统一控制，支持风速百分比和预设模式
 - **Switch（开关）** - 电源开关、童锁、显示屏等
-- **Number（数值）** - 风速、目标湿度、定时器等
+- **Number（数值）** - 目标湿度、定时器等
 - **Select（选择）** - 运行模式、风速档位等
 - **Sensor（传感器）** - 空气质量、湿度、温度、滤芯寿命等
 
