@@ -3,11 +3,11 @@ from homeassistant.const import Platform
 DOMAIN = 'treeow'
 
 SUPPORTED_PLATFORMS = [
+    Platform.FAN,
+    Platform.SWITCH,
     Platform.SELECT,
     Platform.NUMBER,
-    Platform.SENSOR,
-    Platform.SWITCH,
-    Platform.FAN
+    Platform.SENSOR
 ]
 
 FILTER_TYPE_INCLUDE = 'include'
