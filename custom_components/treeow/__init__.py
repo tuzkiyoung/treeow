@@ -2,7 +2,6 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -25,7 +24,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Optimized setup entry with reduced initialization time."""
+    # Runtime state is keyed by domain, not by entry_id: a second config entry would
+    # overwrite the first one's devices and client. Single-account setups only.
     hass.data.setdefault(DOMAIN, {
         'devices': [],
         'signals': [],
@@ -81,8 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event, account_cfg: Optional[AccountConfig] = None):
-    """Optimized token updater with exponential backoff retry."""
+async def _token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event, account_cfg: AccountConfig):
     token_retry_delay = TOKEN_RETRY_DELAY
     
     while not signal.is_set():
@@ -110,16 +109,9 @@ async def _token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: thread
         await asyncio.sleep(TOKEN_CHECK_INTERVAL)
 
 
-async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg: Optional[AccountConfig] = None) -> bool:
-    """Optimized token update with better error handling."""
-    if account_cfg is None:
-        account_cfg = AccountConfig(hass, entry)
-    
-    client = hass.data[DOMAIN].get('client')
-    if client is None:
-        # Create temporary client with default versions for token operations
-        client = TreeowClient(hass, account_cfg.access_token)
-    
+async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg: AccountConfig) -> bool:
+    client = hass.data[DOMAIN]['client']
+
     try:
         # Check token validity
         try:
@@ -154,7 +146,6 @@ async def _try_update_token(hass: HomeAssistant, entry: ConfigEntry, account_cfg
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Optimized cleanup with proper resource management."""
     # Unload platforms in parallel for faster cleanup
     unload_results = await asyncio.gather(
         *[hass.config_entries.async_forward_entry_unload(entry, platform) for platform in SUPPORTED_PLATFORMS],
@@ -175,12 +166,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _entry_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Optimized update listener."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEntry, device: DeviceEntry) -> bool:
-    """Optimized device removal with better error handling."""
     device_identifiers = list(device.identifiers)
     if not device_identifiers:
         _LOGGER.error('Device identifier is empty')
@@ -219,7 +208,6 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config: ConfigEn
 
 
 async def async_register_entity(hass: HomeAssistant, entry: ConfigEntry, async_add_entities, platform, setup) -> None:
-    """Optimized entity registration with batch processing."""
     devices = hass.data[DOMAIN].get('devices', [])
     if not devices:
         _LOGGER.warning('No devices available')

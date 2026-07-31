@@ -1,7 +1,6 @@
-import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 
-from homeassistant.core import Event
+from homeassistant.core import Event, callback
 from homeassistant.helpers.entity import DeviceInfo, Entity
 
 from . import DOMAIN
@@ -10,13 +9,8 @@ from .core.attribute import TreeowAttribute
 from .core.device import TreeowDevice
 from .core.event import listen_event, fire_event
 
-_LOGGER = logging.getLogger(__name__)
-
 
 class TreeowAbstractEntity(Entity, ABC):
-    """Optimized abstract entity with reduced memory footprint."""
-
-    __slots__ = ('_device', '_attribute', '_attributes_data', '_listen_cancel', '_device_id')
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         self._device_id = str(device.id)
@@ -30,7 +24,7 @@ class TreeowAbstractEntity(Entity, ABC):
             manufacturer='树新风',
             model=device.category
         )
-        
+
         for key, value in attribute.options.items():
             setattr(self, f'_attr_{key}', value)
 
@@ -40,34 +34,33 @@ class TreeowAbstractEntity(Entity, ABC):
         self._listen_cancel = []
 
     def _send_command(self, attributes):
-        """Send control command with optimized event firing."""
         fire_event(self.hass, EVENT_DEVICE_CONTROL, {
             'device': self._device.to_dict(),
             'attributes': attributes
         })
 
-    @abstractmethod
     def _update_value(self):
-        pass
+        """Push device data into _attr_* fields. Property-driven entities need no override."""
 
     async def async_added_to_hass(self) -> None:
-        """Optimized entity setup with efficient event handling."""
         def status_callback(event):
             self._attr_available = event.data['status']
-            self.schedule_update_ha_state()
-        
+            self.async_write_ha_state()
+
         self._listen_cancel.append(listen_event(self.hass, EVENT_GATEWAY_STATUS_CHANGED, status_callback))
 
-        def data_callback(event):
-            event_data = event.data
-            if event_data['deviceId'] != self._device_id:
-                return
-            
-            self._attributes_data = event_data['attributes']
-            self._update_value()
-            self.schedule_update_ha_state()
+        @callback
+        def is_own_device(event_data: dict) -> bool:
+            return event_data.get('deviceId') == self._device_id
 
-        self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_DATA_CHANGED, data_callback))
+        def data_callback(event):
+            self._attributes_data = event.data['attributes']
+            self._update_value()
+            self.async_write_ha_state()
+
+        self._listen_cancel.append(
+            listen_event(self.hass, EVENT_DEVICE_DATA_CHANGED, data_callback, is_own_device)
+        )
 
         # Initialize with snapshot data
         data_callback(Event('', data={
@@ -76,8 +69,9 @@ class TreeowAbstractEntity(Entity, ABC):
         }))
 
     async def async_will_remove_from_hass(self) -> None:
-        """Optimized cleanup with batch operation."""
         for cancel in self._listen_cancel:
             cancel()
         self._listen_cancel.clear()
-        self._attributes_data.clear()
+        # _attributes_data is deliberately left alone: until the first poll it
+        # still aliases device.attribute_snapshot_data, which every other entity
+        # of this device bootstraps from. Clearing it here would blank them.

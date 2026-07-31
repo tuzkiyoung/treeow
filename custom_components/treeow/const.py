@@ -27,9 +27,6 @@ GET_IOS_VERSION_API = 'https://endoflife.date/api/v1/products/ios/releases/lates
 # Timing Constants
 HEARTBEAT_INTERVAL = 10  # seconds
 DEFAULT_POLL_INTERVAL = 5  # seconds
-RETRY_DELAY = 5  # seconds
-RETRY_MULTIPLIER = 2  # retry delay multiplier
-MAX_RETRY_DELAY = 60  # seconds
 
 # Other Constants
 DEFAULT_PAGE_SIZE = 50
