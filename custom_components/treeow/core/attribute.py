@@ -15,8 +15,6 @@ from homeassistant.const import (
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER
 )
 
-from custom_components.treeow.helpers import equals_ignore_case, contains_any_ignore_case
-
 _LOGGER = logging.getLogger(__name__)
 
 EXCLUDED_ATTRIBUTES = frozenset(('wifi_info', 'timestamp'))
@@ -32,6 +30,10 @@ SENSOR_KEYWORDS = {
     '水量': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
     '液位': (SensorStateClass.MEASUREMENT, None, PERCENTAGE),
 }
+
+# The powered-off gear, synthesised below because the vendor spec omits it.
+OFF_GEAR_VALUE = 255
+OFF_GEAR_DESC = '0gear'
 
 IDENTIFIER_MAPPINGS = {
     'pm25': (SensorStateClass.MEASUREMENT, SensorDeviceClass.PM25, CONCENTRATION_MICROGRAMS_PER_CUBIC_METER),
@@ -116,7 +118,7 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         
         if schema_type == 'boolean':
             return self._parse_as_switch(attribute)
-        elif 'step' in schema and contains_any_ignore_case(schema_type, ['Integer', 'Double']):
+        elif 'step' in schema and isinstance(schema_type, str) and schema_type.lower() in ('integer', 'double'):
             return self._parse_as_number(attribute)
         elif schema_type == 'integer' and isinstance(schema.get('enum'), list):
             return self._parse_as_select(attribute)
@@ -125,22 +127,16 @@ class V1SpecAttributeParser(TreeowAttributeParser):
 
     def parse_global(self, attributes: List[dict], device_category: str = None):
         # Use set for O(1) lookup, filter out attributes without identifier
-        attribute_keys = set()
-        for attr in attributes:
-            if attr.get('identifier'):
-                attribute_keys.add(attr.get('identifier'))
-        
+        attribute_keys = {attr['identifier'] for attr in attributes if attr.get('identifier')}
+
         if 'switch' in attribute_keys and 'fan_speed_enum' in attribute_keys:
-            fan_identifier = self._get_fan_identifier(device_category)
+            fan_identifier = device_category.lower() if device_category else 'fan_entity'
             yield TreeowAttribute(fan_identifier, '风扇', Platform.FAN)
         elif {'pm25', 'filter', 'fan'}.issubset(attribute_keys):
             for attr in attributes:
                 if attr['identifier'] == 'fan':
                     yield self._parse_as_fan(attr)
                     break
-    
-    def _get_fan_identifier(self, device_category: str) -> str:
-        return device_category.lower() if device_category else 'fan_entity'
 
     def _parse_as_fan(self, attribute: dict) -> TreeowAttribute:
         display_name = self._get_display_name(attribute.get('title', ''))
@@ -149,10 +145,9 @@ class V1SpecAttributeParser(TreeowAttributeParser):
     def _parse_as_sensor(self, attribute: dict) -> TreeowAttribute:
         display_name = self._get_display_name(attribute.get('title', ''))
         options = {}
-        ext = {}
 
-        schema = attribute.get('schema', {})
-        if equals_ignore_case(schema.get('type'), 'integer'):
+        schema_type = attribute.get('schema', {}).get('type')
+        if isinstance(schema_type, str) and schema_type.lower() == 'integer':
             state_class, device_class, unit = self._guess_state_class_device_class_and_unit(attribute)
             
             if device_class:
@@ -162,7 +157,7 @@ class V1SpecAttributeParser(TreeowAttributeParser):
             if unit:
                 options['native_unit_of_measurement'] = unit
 
-        return TreeowAttribute(attribute['identifier'], display_name, Platform.SENSOR, options, ext)
+        return TreeowAttribute(attribute['identifier'], display_name, Platform.SENSOR, options)
 
     def _parse_as_number(self, attribute: dict) -> TreeowAttribute:
         display_name = self._get_display_name(attribute.get('title', ''))
@@ -188,18 +183,25 @@ class V1SpecAttributeParser(TreeowAttributeParser):
         enum = schema.get('enum', [])
         enum_desc = schema.get('enumDesc', [])
         
-        # Special handling for fan speed
-        if attribute['identifier'] == 'fan_speed_enum':
-            enum = [255] + enum
-            enum_desc = ['0gear'] + enum_desc
-        
+        # The vendor spec omits the powered-off gear, but devices do report 255 when
+        # off. Without this the UI keeps showing the last running gear after power off.
+        is_fan_speed = attribute['identifier'] == 'fan_speed_enum'
+        if is_fan_speed:
+            enum = [OFF_GEAR_VALUE] + enum
+            enum_desc = [OFF_GEAR_DESC] + enum_desc
+
         # Create bidirectional mapping for better performance
         value_comparison_table = {}
-        for i, (val, desc) in enumerate(zip(enum, enum_desc)):
+        for val, desc in zip(enum, enum_desc):
             value_comparison_table[val] = desc
             value_comparison_table[desc] = val
 
         ext = {'value_comparison_table': value_comparison_table}
+        if is_fan_speed:
+            # Flagged, not filtered: the select entity must keep showing this so a
+            # powered-off device reads '0gear', but it is not a speed the fan can
+            # be set to, so anything doing speed maths has to drop it.
+            ext['off_option'] = OFF_GEAR_DESC
         options = {'options': list(enum_desc)}
 
         return TreeowAttribute(attribute['identifier'], display_name, Platform.SELECT, options, ext)

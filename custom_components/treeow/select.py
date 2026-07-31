@@ -14,44 +14,26 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
-    """Optimized select setup with batch processing."""
-    await async_register_entity(
-        hass,
-        entry,
-        async_add_entities,
-        Platform.SELECT,
-        TreeowSelect
-    )
+    await async_register_entity(hass, entry, async_add_entities, Platform.SELECT, TreeowSelect)
 
 
 class TreeowSelect(TreeowAbstractEntity, SelectEntity):
-    """Optimized select entity with cached comparison table."""
-
-    __slots__ = ('_attr_key', '_value_comparison_table', '_reverse_comparison_table')
 
     def __init__(self, device: TreeowDevice, attribute: TreeowAttribute):
         super().__init__(device, attribute)
-        
-        # Cache attribute key to avoid repeated property access
-        self._attr_key = attribute.key
-        
+
         if 'value_comparison_table' not in attribute.ext:
             raise ValueError(f'Device [{device.id}] attribute [{attribute.key}] missing value_comparison_table')
-            
+
+        # Built bidirectionally by V1SpecAttributeParser._parse_as_select: raw <-> display
         self._value_comparison_table = attribute.ext['value_comparison_table']
-        
-        # Create reverse lookup table
-        self._reverse_comparison_table = {}
-        for key, value in self._value_comparison_table.items():
-            self._reverse_comparison_table[value] = key
 
     def _update_value(self):
-        """Optimized value update with cached lookup tables."""
-        value = self._attributes_data.get(self._attr_key)
+        value = self._attributes_data.get(self._attribute.key)
         if value is None:
             self._attr_current_option = None
             return
-            
+
         if value in self._value_comparison_table:
             self._attr_current_option = self._value_comparison_table[value]
         else:
@@ -59,14 +41,13 @@ class TreeowSelect(TreeowAbstractEntity, SelectEntity):
             self._attr_current_option = str(value)
 
     def select_option(self, option: str) -> None:
-        """Select an option with optimized reverse lookup."""
         if option == self._attr_current_option:
             return
-            
-        if option in self._reverse_comparison_table:
-            command_value = self._reverse_comparison_table[option]
+
+        if option in self._value_comparison_table:
+            command_value = self._value_comparison_table[option]
         else:
             _LOGGER.warning(f'Select [{self._attr_unique_id}] option [{option}] not in available list')
             command_value = option
-            
-        self._send_command({self._attr_key: command_value})
+
+        self._send_command({self._attribute.key: command_value})

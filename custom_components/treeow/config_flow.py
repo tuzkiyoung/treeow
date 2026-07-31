@@ -58,13 +58,15 @@ class TreeowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        # config_entry is now automatically available through the base class
-        super().__init__()
+
+    # Carries the device picked in async_step_entity_device_selector through to
+    # async_step_entity_filter. Kept on the handler, not in hass.data, so that
+    # two concurrent options flows can't clobber each other.
+    _entity_filter_target_device: str = ''
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """
@@ -160,7 +162,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         :return:
         """
         if user_input is not None:
-            self.hass.data.setdefault(DOMAIN, {})['entity_filter_target_device'] = user_input['target_device']
+            self._entity_filter_target_device = user_input['target_device']
             return await self.async_step_entity_filter()
 
         devices = {}
@@ -192,10 +194,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             return self.async_create_entry(title='', data={})
 
-        domain_data = self.hass.data.get(DOMAIN, {})
-        target_device_id = domain_data.pop('entity_filter_target_device', '')
+        target_device_id = self._entity_filter_target_device
         target_device = None
-        for device in domain_data.get('devices', []):
+        for device in self.hass.data.get(DOMAIN, {}).get('devices', []):
             if str(device.id) == target_device_id:
                 target_device = device
                 break
