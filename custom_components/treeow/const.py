@@ -34,6 +34,10 @@ DEFAULT_POLL_INTERVAL = 5  # seconds
 MAX_POLL_FAILURES = 3
 
 # Device online flag as returned by DESCRIBE_DEVICES_API's `data.status`.
+# Verified against a device cut off from the cloud at the router: the flag goes
+# 1 -> 2 about 75s after the device stops reporting, and back to 1 on reconnect.
+# Offline is NOT 0, which is why callers must treat anything other than 1 as
+# offline rather than comparing against a specific offline value.
 DEVICE_STATUS_ONLINE = 1
 
 # Other Constants
