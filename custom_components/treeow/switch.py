@@ -21,17 +21,20 @@ class TreeowSwitch(TreeowAbstractEntity, SwitchEntity):
 
     def _update_value(self):
         value = self._attributes_data.get(self._attribute.key)
+
         if value is None:
             self._attr_is_on = False
             return
 
         try:
             self._attr_is_on = try_read_as_bool(value)
-            if not self._attr_available:
-                self._attr_available = True
+            # Deliberately not reset above the None check: a key that vanishes
+            # carries no state, so it must not clear an earlier parse failure and
+            # resurrect the entity reporting a value the device never sent.
+            self._value_available = True
         except ValueError:
             _LOGGER.warning(f'Switch [{self._attr_unique_id}] failed to read value: {value}')
-            self._attr_available = False
+            self._value_available = False
 
     def turn_on(self, **kwargs: Any) -> None:
         if self._attr_is_on:
