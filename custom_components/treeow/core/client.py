@@ -15,6 +15,7 @@ from custom_components.treeow import const
 from custom_components.treeow.const import (
     EVENT_DEVICE_CONTROL,
     EVENT_DEVICE_DATA_CHANGED,
+    EVENT_DEVICE_STATUS_CHANGED,
     EVENT_GATEWAY_STATUS_CHANGED,
     DEFAULT_APP_VERSION,
     DEFAULT_IOS_VERSION
@@ -360,7 +361,12 @@ class TreeowClient:
                 data = content.get('data')
                 if not data:
                     return {}, []
-                
+
+                # Seed availability from the same payload the poll loop will use,
+                # so a device that is already offline at startup never presents as
+                # available on the strength of the cached props below.
+                self._publish_availability(device, self._is_device_online(data))
+
                 # Parse device data
                 props = data.get('props', [])
                 if not props:
@@ -472,10 +478,74 @@ class TreeowClient:
                 {"id": device.id}, headers
             )
         except TreeowClientException:
-            return  # already logged by _request
+            # Already logged by _request. The device is not necessarily offline --
+            # the cloud may just be unreachable -- so only give up after several
+            # consecutive misses.
+            self._register_poll_failure(device)
+            return
 
-        if content.get('data'):
-            await self._parse_message(device, content['data'])
+        # isinstance guard, not just truthiness: _is_device_online below indexes
+        # into this, and unlike _parse_message it has no exception handler of its
+        # own. A malformed body must land on the failure path, not raise out of
+        # here into the gather that silently drops it.
+        data = content.get('data')
+        if not isinstance(data, dict) or not data:
+            self._register_poll_failure(device)
+            return
+
+        device.poll_failures = 0
+
+        # The cloud keeps serving a disconnected device's last known props, so a
+        # successful poll says nothing about the device itself -- only this flag does.
+        online = self._is_device_online(data)
+        if online:
+            # Parse before publishing, so that on recovery the state write
+            # triggered by becoming available already carries the fresh values
+            # instead of the ones cached from before the outage. While offline
+            # the parse is skipped outright: every entity is unavailable, so the
+            # decode and the resulting fan-out would be discarded.
+            await self._parse_message(device, data)
+
+        self._publish_availability(device, online)
+
+    @staticmethod
+    def _is_device_online(data: Dict[str, Any]) -> bool:
+        """Read the device-level online flag out of a device/info payload.
+
+        Absent or unparseable means 'this endpoint did not tell us', which must
+        read as online: inventing an offline state would black out every entity
+        of any device whose response omits the field.
+        """
+        status = data.get('status')
+        if status is None:
+            return True
+
+        try:
+            return int(status) == const.DEVICE_STATUS_ONLINE
+        except (TypeError, ValueError):
+            _LOGGER.debug(f'Unparseable device status {status!r}, assuming online')
+            return True
+
+    def _register_poll_failure(self, device: TreeowDevice) -> None:
+        device.poll_failures += 1
+
+        if device.poll_failures >= const.MAX_POLL_FAILURES:
+            self._publish_availability(device, False)
+
+    def _publish_availability(self, device: TreeowDevice, available: bool) -> None:
+        """Fire only on an actual transition -- polling is every few seconds and
+        entities re-render on each event."""
+        if device.available == available:
+            return
+
+        device.available = available
+        _LOGGER.info(
+            f'Device {device.id} is now {"online" if available else "offline"}'
+        )
+        fire_event(self._hass, EVENT_DEVICE_STATUS_CHANGED, {
+            'deviceId': str(device.id),
+            'status': available
+        })
 
     async def _send_heartbeat(self, device: TreeowDevice, event: threading.Event) -> None:
         heartbeat_retry_delay = 1  # Start with 1 second for fast heartbeat recovery

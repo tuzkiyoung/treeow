@@ -8,13 +8,21 @@ _LOGGER = logging.getLogger(__name__)
 
 class TreeowDevice:
 
-    __slots__ = ('_client', '_raw_data', '_attributes', '_attribute_snapshot_data')
+    # `available` and `poll_failures` are the two halves of one state machine and
+    # live here, not in a side table on the client, so they are reachable from
+    # anything holding the device and are collected along with it. Plain
+    # attributes rather than properties: unlike the accessors below they are
+    # mutable runtime state, not read-only views over _raw_data.
+    __slots__ = ('_client', '_raw_data', '_attributes', '_attribute_snapshot_data',
+                 'available', 'poll_failures')
 
     def __init__(self, client, raw: dict):
         self._client = client
         self._raw_data = raw
         self._attributes = []
         self._attribute_snapshot_data = {}
+        self.available = True
+        self.poll_failures = 0
 
     @property
     def id(self):

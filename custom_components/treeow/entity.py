@@ -4,7 +4,12 @@ from homeassistant.core import Event, callback
 from homeassistant.helpers.entity import DeviceInfo, Entity
 
 from . import DOMAIN
-from .const import EVENT_DEVICE_CONTROL, EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
+from .const import (
+    EVENT_DEVICE_CONTROL,
+    EVENT_DEVICE_DATA_CHANGED,
+    EVENT_DEVICE_STATUS_CHANGED,
+    EVENT_GATEWAY_STATUS_CHANGED
+)
 from .core.attribute import TreeowAttribute
 from .core.device import TreeowDevice
 from .core.event import listen_event, fire_event
@@ -33,6 +38,17 @@ class TreeowAbstractEntity(Entity, ABC):
         self._attributes_data = {}
         self._listen_cancel = []
 
+        # Availability has three inputs, kept apart so recovering on one axis
+        # cannot mask a failure on another. Device reachability is read straight
+        # off the device rather than mirrored here -- a copy would go stale
+        # whenever something set it without firing the change event.
+        self._gateway_available = True   # is the polling loop running at all
+        self._value_available = True     # did this attribute's value parse
+
+    @property
+    def available(self) -> bool:
+        return self._gateway_available and self._device.available and self._value_available
+
     def _send_command(self, attributes):
         fire_event(self.hass, EVENT_DEVICE_CONTROL, {
             'device': self._device.to_dict(),
@@ -43,15 +59,25 @@ class TreeowAbstractEntity(Entity, ABC):
         """Push device data into _attr_* fields. Property-driven entities need no override."""
 
     async def async_added_to_hass(self) -> None:
-        def status_callback(event):
-            self._attr_available = event.data['status']
-            self.async_write_ha_state()
-
-        self._listen_cancel.append(listen_event(self.hass, EVENT_GATEWAY_STATUS_CHANGED, status_callback))
-
         @callback
         def is_own_device(event_data: dict) -> bool:
             return event_data.get('deviceId') == self._device_id
+
+        def gateway_status_callback(event):
+            self._gateway_available = event.data['status']
+            self.async_write_ha_state()
+
+        self._listen_cancel.append(
+            listen_event(self.hass, EVENT_GATEWAY_STATUS_CHANGED, gateway_status_callback)
+        )
+
+        def device_status_callback(event):
+            # The new value is already on the device; this only needs to re-render.
+            self.async_write_ha_state()
+
+        self._listen_cancel.append(
+            listen_event(self.hass, EVENT_DEVICE_STATUS_CHANGED, device_status_callback, is_own_device)
+        )
 
         def data_callback(event):
             self._attributes_data = event.data['attributes']
